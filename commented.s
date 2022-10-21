@@ -86,8 +86,11 @@ makeB:
 	mov	eax, DWORD PTR -20[rbp]     # eax := rbp[-20] -- в регистр кладем только что полженный на стек array_size
 	mov	esi, eax                    # esi := eax -- в esi теперь array_size
 	lea	rdi, A[rip]                 # rdi := &rip[A] -- адрес на начало массива
-	call	getMin                  # Вызов функции getMin. Результат в регистре eax
-	mov	DWORD PTR -8[rbp], eax      # rbp[-8] := eax // <=> int min = getMin(A, array_size)
+	
+    call	getMin                  # Вызов функции getMin. Первый аргумент в rdi = &rip[A], второй в esi (rsi) = array_size
+                                    # Результат возвращается через eax
+	
+    mov	DWORD PTR -8[rbp], eax      # rbp[-8] := eax // <=> int min = getMin(A, array_size)
 	mov	DWORD PTR -4[rbp], 0        # rbp[-4] := 0 // <=> int i = 0
 	jmp	.L8         
 .L11:                               #
@@ -126,8 +129,8 @@ makeB:
 	mov	eax, DWORD PTR -4[rbp]      # eax := rbp[-4] // <=> eax := i
 	cmp	eax, DWORD PTR -20[rbp]     # Сравниваем i (eax) и array_size (rbp[-20])
 	jl	.L11                        # Если i < array_size, переходим к телу цикла
-	nop                             #
-	nop                             #
+	nop                             # Выравнивание для оптимизации
+	nop                             # Выравнивание для оптимизации
 
     leave                           # | Эпилог функции
 	ret                             # \
@@ -145,53 +148,56 @@ readArraySizeFromConsole:
 	mov	rbp, rsp                    # | Пролог
 	sub	rsp, 16                     # |
 
-	mov	QWORD PTR -8[rbp], rdi      # rbp[-8] := 
-	mov	rax, QWORD PTR -8[rbp]
-	mov	rsi, rax
-	lea	rdi, .LC0[rip]
-	mov	eax, 0
-	call	__isoc99_scanf@PLT
+	mov	QWORD PTR -8[rbp], rdi      # rbp[-8] := rdi <=> rbp[-8] := size -- кладём на стек первый аргумент (указатель на число)
+	mov	rax, QWORD PTR -8[rbp]      # rax := rbp[-8] <=> rax := size -- теперь в rax лежит int *size
+	mov	rsi, rax                    # rsi := rax <=> rax := size // rsi -- второй аргумент для вызова scanf 
+	lea	rdi, .LC0[rip]              # rdi := &rip[.LC0] -- адрес на начало форматной строки // rdi -- первый аргумент
+	mov	eax, 0                      # Обнуляем eax
+	call	__isoc99_scanf@PLT      # Вызываем scanf
 
-	mov	rax, QWORD PTR -8[rbp]
-	mov	edx, DWORD PTR [rax]
-	mov	eax, DWORD PTR MAX_N[rip]
-	cmp	edx, eax
-	jle	.L13
-	mov	eax, 1
-	jmp	.L14
-.L13:
-	mov	eax, 0
+	mov	rax, QWORD PTR -8[rbp]      # rax := rbp[-8] <=> rax := size
+	mov	edx, DWORD PTR [rax]        # edx := [eax] <=> edx := *(eax) // size -- указатель, поэтому нужно разыменовать его.
+	mov	eax, DWORD PTR MAX_N[rip]   # eax := rip[MAX_N] // копируем число из статики -- максимально допустимый размер массива.
+	cmp	edx, eax                    # Сравниваем *size (edx) и MAX_N (eax)
+	jle	.L13                        # Если *size <= MAX_N, условие не выполнилось, переходим к другой метке.
+	mov	eax, 1                      # Иначе return 1
+	jmp	.L14                        # Переходим к метке с эпилогом
+.L13:                               
+	mov	eax, 0                      # return 0
 .L14:
-	leave
-	ret
+	leave                           # | Эпилог
+	ret                             # \
 	.size	readArraySizeFromConsole, .-readArraySizeFromConsole
 	.globl	readArraySizeFromFile
 	.type	readArraySizeFromFile, @function
 readArraySizeFromFile:
-	endbr64
-	push	rbp
-	mov	rbp, rsp
-	sub	rsp, 16
-	mov	QWORD PTR -8[rbp], rdi
-	mov	QWORD PTR -16[rbp], rsi
-	mov	rdx, QWORD PTR -16[rbp]
-	mov	rax, QWORD PTR -8[rbp]
-	lea	rsi, .LC0[rip]
-	mov	rdi, rax
-	mov	eax, 0
-	call	__isoc99_fscanf@PLT
-	mov	rax, QWORD PTR -16[rbp]
-	mov	edx, DWORD PTR [rax]
-	mov	eax, DWORD PTR MAX_N[rip]
-	cmp	edx, eax
-	jle	.L16
-	mov	eax, 1
-	jmp	.L17
+	endbr64                         # /
+	push	rbp                     # |
+	mov	rbp, rsp                    # | Пролог
+	sub	rsp, 16                     # |
+	
+    mov	QWORD PTR -8[rbp], rdi      # rbp[-8] := rdi <=> rbp[-8] := fin -- сохраняем на стек указатель на файл (первый аргумент).
+	mov	QWORD PTR -16[rbp], rsi     # rbp[-16] := rsi <=> rbp[-16] := size -- сохраняем на стек указатель на число (второй аргумент).
+	mov	rdx, QWORD PTR -16[rbp]     # rdx := rbp[-16] <=> rdx := size (третий аргумент для вызова fscanf)
+	mov	rax, QWORD PTR -8[rbp]      # rax := rbp[-8] <=> rax := fin
+	lea	rsi, .LC0[rip]              # rsi := &rip[.LC0] -- адрес начала форматной строки (второй аргумент для вызова fscanf)
+	mov	rdi, rax                    # rdi := rax -- указатель на файл (первый аргумент для вызова fscanf) 
+	mov	eax, 0                      # Обнуляем eax
+	call	__isoc99_fscanf@PLT     # Вызываем fscanf
+	mov	rax, QWORD PTR -16[rbp]     # rax := rbp[-16] <=> rax := size
+	mov	edx, DWORD PTR [rax]        # edx := [edx] <=> edx := *size -- разыменовываем указатель
+	mov	eax, DWORD PTR MAX_N[rip]   # eax := rip[MAX_N] <=> eax := MAX_N
+	cmp	edx, eax                    # Сравниваем *size (edx) и MAX_N (eax)
+	jle	.L16                        # Если *size <= MAX_N
+	mov	eax, 1                      # return 1
+	jmp	.L17                        # Переходим к эпилогу функции
+
 .L16:
-	mov	eax, 0
+	mov	eax, 0                      # return 0
+
 .L17:
-	leave
-	ret
+	leave                           # | Эпилог функции
+	ret                             # \ 
 	.size	readArraySizeFromFile, .-readArraySizeFromFile
 	.globl	readArrayFromConsole
 	.type	readArrayFromConsole, @function

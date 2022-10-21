@@ -1,4 +1,3 @@
-	.file	"program.c"
 	.intel_syntax noprefix
 	.text
 	.local	A
@@ -6,7 +5,6 @@
 	.local	B
 	.comm	B,4000000,32
 	.data
-	.align 4
 	.type	MAX_N, @object
 	.size	MAX_N, 4
 MAX_N:
@@ -15,13 +13,12 @@ MAX_N:
 	.globl	getMin
 	.type	getMin, @function
 getMin:                             # Функция нахождения минимума в массиве
-	# endbr64             <====       Удаляем, 
 	push	rbp                     # /
 	mov	rbp, rsp                    # | Пролог
 	
     mov	QWORD PTR -24[rbp], rdi     # rbp[-24] := rdi // Положили на стек первый аргумент -- int *array
 	mov	DWORD PTR -28[rbp], esi     # rbp[-28] := esi // Положили на стек второй агрумент -- int array_size
-	mov	eax, DWORD PTR A[rip]       # eax := rip[A] // <=> int min = A[0]
+	mov	eax, DWORD PTR A[rip]       # eax := A[rip] // <=> int min = A[0]
 	mov	DWORD PTR -4[rbp], eax      # rbp[-4] := eax // Кладем на стек min
 	mov	DWORD PTR -8[rbp], 1        # rbp[-8] := 1 // Положили на стек значение счётчика i
 	
@@ -31,37 +28,33 @@ getMin:                             # Функция нахождения мин
     # eax пока тоже хранит значение минимума, но скоро будет использоваться для других целей.
     
     jmp	.L2                         # Переходим на метку, в которой будет проверяться условие цикла
-
-.L5:                                # В метке .L5 проверяется условию внутри оператора if
+.L5:
 	cmp	DWORD PTR -4[rbp], 0        # Сравниваем min (rbp[-4]) и 0
 	je	.L3                         # min == 0 => условие истинно, переходим в тело условного оператора
 	mov	eax, DWORD PTR -8[rbp]      # eax := rbp[-8] // <=> eax := i
-	cdqe                            # rax := sign-extend of eax. Копирует знак (31 бит) в старшие 32 бита регистра rax
-	lea	rdx, 0[0+rax*4]             # 
-	lea	rax, A[rip]                 # rax := &rip[A] -- адрес начала массива
+	cdqe                            # 
+	lea	rdx, 0[0+rax*4]             #
+	lea	rax, A[rip]                 #
 	mov	eax, DWORD PTR [rdx+rax]    # eax := [rdx + rax] // <=> eax := A[i]
 	cmp	DWORD PTR -4[rbp], eax      # Сравниваем min (rbp[-4]) и A[i] (eax)
 	jle	.L4                         # Если min <= A[i], условие не выполняется и мы переходим на следуюзую итерацию
 	                                # Иначе проверяем, второй операнд &&
     mov	eax, DWORD PTR -8[rbp]      # eax := rbp[-8] // <=> eax := i
-	cdqe                            # rax := sign-extend of eax. Копирует знак (31 бит) в старшие 32 бита регистра rax 
+	cdqe                            # 
 	lea	rdx, 0[0+rax*4]             # 
 	lea	rax, A[rip]                 #
 	mov	eax, DWORD PTR [rdx+rax]    # eax := [rdx + rax] // <=> eax := A[i]
 	test	eax, eax                # 
-	je	.L4                         #
-
+	je	.L4
 .L3:                                # Тело условного оператора
 	mov	eax, DWORD PTR -8[rbp]      # eax := rbp[-8] // <=> eax := i
-	cdqe                            # rax := sign-extend of eax. Копирует знак (31 бит) в старшие 32 бита регистра rax
+	cdqe                            #
 	lea	rdx, 0[0+rax*4]             # 
-	lea	rax, A[rip]                 # rax := &rip[A] -- адрес на начало массива
-	mov	eax, DWORD PTR [rdx+rax]    # eax := [rdx + rax] // <=> eax := A[i]
-	mov	DWORD PTR -4[rbp], eax      # rbp[-4] := eax // <=> min := A[i] 
-
+	lea	rax, A[rip]                 #
+	mov	eax, DWORD PTR [rdx+rax]    #
+	mov	DWORD PTR -4[rbp], eax      #
 .L4:
 	add	DWORD PTR -8[rbp], 1        # rbp[-8] += 1 // <=> ++i
-
 .L2:
 	mov	eax, DWORD PTR -8[rbp]      # eax := rbp[-8] // <=> eax := i
 	cmp	eax, DWORD PTR -28[rbp]     # Сравниваем значение счётчика (eax) и array_size (rbp[-28])
@@ -73,7 +66,6 @@ getMin:                             # Функция нахождения мин
     
     pop	rbp                         # | Эпилог функции           
 	ret                             # \
-	.size	getMin, .-getMin
 	.globl	makeB
 	.type	makeB, @function
 makeB:
@@ -82,70 +74,66 @@ makeB:
 	mov	rbp, rsp                    # |
 	sub	rsp, 24                     # |
 
+
 	mov	DWORD PTR -20[rbp], edi     # rbp[-20] := edi -- положили на стек первый аргумент -- int array_size
-	mov	eax, DWORD PTR -20[rbp]     # eax := rbp[-20] -- в регистр кладем только что полженный на стек array_size
-	mov	esi, eax                    # esi := eax -- в esi теперь array_size
-	lea	rdi, A[rip]                 # rdi := &rip[A] -- адрес на начало массива
-	call	getMin                  # Вызов функции getMin. Результат в регистре eax
-	mov	DWORD PTR -8[rbp], eax      # rbp[-8] := eax // <=> int min = getMin(A, array_size)
-	mov	DWORD PTR -4[rbp], 0        # rbp[-4] := 0 // <=> int i = 0
-	jmp	.L8         
-.L11:                               #
-	mov	eax, DWORD PTR -4[rbp]      # eax := rbp[-4] // <=> eax := i
-	cdqe                            # rax := sign-extend of eax. Копирует знак (31 бит) в старшие 32 бита регистра rax
-	lea	rdx, 0[0+rax*4]             #
-	lea	rax, A[rip]                 # rax := &rip[A] -- адрес начала массива
-	mov	eax, DWORD PTR [rdx+rax]    # eax := [rdx + rax] // <=> eax := A[i]
-	test	eax, eax                #
-	jne	.L9                         #
-	mov	eax, DWORD PTR -4[rbp]      # eax := rbp[-4] // <=> eax := i
-	cdqe                            # rax := sign-extend of eax. Копирует знак (31 бит) в старшие 32 бита регистра rax
-	lea	rcx, 0[0+rax*4]             # 
-	lea	rdx, B[rip]                 # rdx := &rip[B] -- адрес начала массива B
-	mov	eax, DWORD PTR -8[rbp]      # eax := rbp[-8] // <=> eax := min
-	mov	DWORD PTR [rcx+rdx], eax    # [rcx + rdx] := eax // <=> B[i] = min
-	jmp	.L10                        # Переходим на метку увеличения счётчика
-
-.L9:                                # else
-	mov	eax, DWORD PTR -4[rbp]      # eax := rbp[-4] // eax := i
-	cdqe                            # rax := sign-extend of eax. Копирует знак (31 бит) в старшие 32 бита регистра rax
-	lea	rdx, 0[0+rax*4]             #
-	lea	rax, A[rip]                 # rax := &rip[A] -- адрес начала массива A
-	mov	eax, DWORD PTR [rdx+rax]    # eax := [rdx + rax] <=> eax := A[i]
-	mov	edx, DWORD PTR -4[rbp]      # edx := rbp[-4] <=> edx := i
-	movsx	rdx, edx                # rdx := edx // Тот же mov, но уже со знаковым расширением (sign-extend).
-                                    # Предположительно используется потому, что cdqe нельзя использовать из-за того, что он занят
-	lea	rcx, 0[0+rdx*4]             # 
-	lea	rdx, B[rip]                 # rdx := &rip[B] -- адрес на начало массива B
-	mov	DWORD PTR [rcx+rdx], eax    # [rcx + rdx] := eax <=> B[i] := A[i]
-
-.L10:                               # метка увеличения счётчика
-	add	DWORD PTR -4[rbp], 1        # ++rbp[-4] <=> ++i
-
-.L8:                            
-	mov	eax, DWORD PTR -4[rbp]      # eax := rbp[-4] // <=> eax := i
-	cmp	eax, DWORD PTR -20[rbp]     # Сравниваем i (eax) и array_size (rbp[-20])
-	jl	.L11                        # Если i < array_size, переходим к телу цикла
+	mov	eax, DWORD PTR -20[rbp]     # eax := rbp[-20] --  в регистр только что полженный на стек array_size
+	mov	esi, eax                    # 
+	lea	rdi, A[rip]
+	call	getMin
+	mov	DWORD PTR -8[rbp], eax
+	mov	DWORD PTR -4[rbp], 0
+	jmp	.L8
+.L11:
+	mov	eax, DWORD PTR -4[rbp]
+	cdqe
+	lea	rdx, 0[0+rax*4]
+	lea	rax, A[rip]
+	mov	eax, DWORD PTR [rdx+rax]
+	test	eax, eax
+	jne	.L9
+	mov	eax, DWORD PTR -4[rbp]
+	cdqe
+	lea	rcx, 0[0+rax*4]
+	lea	rdx, B[rip]
+	mov	eax, DWORD PTR -8[rbp]
+	mov	DWORD PTR [rcx+rdx], eax
+	jmp	.L10
+.L9:
+	mov	eax, DWORD PTR -4[rbp]
+	cdqe
+	lea	rdx, 0[0+rax*4]
+	lea	rax, A[rip]
+	mov	eax, DWORD PTR [rdx+rax]
+	mov	edx, DWORD PTR -4[rbp]
+	movsx	rdx, edx
+	lea	rcx, 0[0+rdx*4]
+	lea	rdx, B[rip]
+	mov	DWORD PTR [rcx+rdx], eax
+.L10:
+	add	DWORD PTR -4[rbp], 1
+.L8:
+	mov	eax, DWORD PTR -4[rbp]
+	cmp	eax, DWORD PTR -20[rbp]
+	jl	.L11                        # 
 	nop                             #
 	nop                             #
 
     leave                           # | Эпилог функции
 	ret                             # \
-	.size	makeB, .-makeB
 	.section	.rodata
 .LC0:
 	.string	"%d"
 	.text
 	.globl	readArraySizeFromConsole
 	.type	readArraySizeFromConsole, @function
-
 readArraySizeFromConsole:
-	endbr64                         # /
-	push	rbp                     # |
-	mov	rbp, rsp                    # | Пролог
-	sub	rsp, 16                     # |
 
-	mov	QWORD PTR -8[rbp], rdi      # rbp[-8] := 
+	endbr64
+	push	rbp
+	mov	rbp, rsp
+	sub	rsp, 16
+
+	mov	QWORD PTR -8[rbp], rdi
 	mov	rax, QWORD PTR -8[rbp]
 	mov	rsi, rax
 	lea	rdi, .LC0[rip]
@@ -164,7 +152,6 @@ readArraySizeFromConsole:
 .L14:
 	leave
 	ret
-	.size	readArraySizeFromConsole, .-readArraySizeFromConsole
 	.globl	readArraySizeFromFile
 	.type	readArraySizeFromFile, @function
 readArraySizeFromFile:
@@ -192,7 +179,6 @@ readArraySizeFromFile:
 .L17:
 	leave
 	ret
-	.size	readArraySizeFromFile, .-readArraySizeFromFile
 	.globl	readArrayFromConsole
 	.type	readArrayFromConsole, @function
 readArrayFromConsole:
@@ -222,7 +208,6 @@ readArrayFromConsole:
 	mov	eax, 0
 	leave
 	ret
-	.size	readArrayFromConsole, .-readArrayFromConsole
 	.globl	readArrayFromFile
 	.type	readArrayFromFile, @function
 readArrayFromFile:
@@ -260,7 +245,6 @@ readArrayFromFile:
 .L24:
 	leave
 	ret
-	.size	readArrayFromFile, .-readArrayFromFile
 	.section	.rodata
 .LC1:
 	.string	"%d "
@@ -268,7 +252,6 @@ readArrayFromFile:
 	.globl	writeArrayToConsole
 	.type	writeArrayToConsole, @function
 writeArrayToConsole:
-	endbr64
 	push	rbp
 	mov	rbp, rsp
 	sub	rsp, 32
@@ -297,7 +280,6 @@ writeArrayToConsole:
 	mov	eax, 0
 	leave
 	ret
-	.size	writeArrayToConsole, .-writeArrayToConsole
 	.globl	writeArrayToFile
 	.type	writeArrayToFile, @function
 writeArrayToFile:
@@ -340,7 +322,6 @@ writeArrayToFile:
 .L33:
 	leave
 	ret
-	.size	writeArrayToFile, .-writeArrayToFile
 	.section	.rodata
 .LC2:
 	.string	"Incorrect size of array"
@@ -379,22 +360,3 @@ main:
 .L39:
 	leave
 	ret
-	.size	main, .-main
-	.ident	"GCC: (Ubuntu 9.4.0-1ubuntu1~20.04.1) 9.4.0"
-	.section	.note.GNU-stack,"",@progbits
-	.section	.note.gnu.property,"a"
-	.align 8
-	.long	 1f - 0f
-	.long	 4f - 1f
-	.long	 5
-0:
-	.string	 "GNU"
-1:
-	.align 8
-	.long	 0xc0000002
-	.long	 3f - 2f
-2:
-	.long	 0x3
-3:
-	.align 8
-4:

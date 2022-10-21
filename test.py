@@ -3,10 +3,12 @@ import argparse
 import subprocess
 import random
 import os
+import sys
 from math import log10, ceil
 
 def get_answer(array):
-    min_el = min(filter(lambda x: x != 0, array))
+    nonzero_elements = list(filter(lambda x: x != 0, array))
+    min_el = min(nonzero_elements) if nonzero_elements else 0
     new_array = list(map(lambda x: min_el if x == 0 else x, array))
     return new_array
 
@@ -27,10 +29,10 @@ def run_test(path_to_executable, input_data, answer, file_in=None, file_out=None
     print("Test:\n{}".format(input_data.strip()))
     print("Program output:\n{}".format(out_data))
     if (out_data == answer):
-        print("Correct!")
+        print("Correct")
     else:
         print("Correct answer:\n{}".format(answer))
-        print("Incorrect:(")
+        print("Incorrect")
     print()
 
 def make_test(max_size, min_size=1):
@@ -59,17 +61,28 @@ def save_test(directory, name, test_data, test_answer):
 parser = argparse.ArgumentParser()
 
 parser.add_argument("executable", help="path to executable file")
-parser.add_argument("size", type=int, help="Number of test cases")
-parser.add_argument("max_array_size", type=int)
+parser.add_argument("--n", dest="size", default=5, type=int, help="Number of test cases")
+parser.add_argument("--mx", dest="max_array_size", default=10, type=int)
 parser.add_argument("-s", dest="save", type=dir_path,
                     help="Save tests in the passed directory")
-parser.add_argument("-t", dest="tests_folder", type=dir_path,
+parser.add_argument("-t", dest="tests_dir", type=dir_path,
                     help="Directory with tests. Tests from there will be used")
-parser.add_argument("-f", action="store_true", help="Uses the file for input/output")
+parser.add_argument("-f", action="store_true", help="Use the file for input/output")
 parser.add_argument("--seed", type=int, default=42)
 args = parser.parse_args()
 
 random.seed(args.seed)
+
+if (args.tests_dir):
+    for filename in os.listdir(args.tests_dir):
+        if (filename.endswith(".a")):
+            continue
+        with open(os.path.join(args.tests_dir, filename), mode="r") as fin:
+            test_data = fin.read()
+        with open(os.path.join(args.tests_dir, "{}.a".format(filename)), mode="r") as fin:
+            test_answer = fin.read()
+        run_test(args.executable, test_data, test_answer)
+    sys.exit(0)
 
 for idx in range(args.size):
     test_data = make_test(args.max_array_size)

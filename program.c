@@ -8,7 +8,7 @@ static int MAX_N = 1000000;
 int getMin(int *array, int array_size) {
     int min = A[0];
     for (int i = 1; i < array_size; ++i) {
-        if ((A[i] < min && A[i] != 0) || min == 0) {
+        if (min == 0 || (A[i] < min && A[i] != 0)) {
             min = A[i];
         }
     }
@@ -99,7 +99,6 @@ int main(int argc, char *argv[]) {
     }
 
     readArrayFromConsole(A, n);
-
     makeB(n);
     writeArrayToConsole(B, n);    
     return 0;

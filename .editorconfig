@@ -1,0 +1,8 @@
+root = true
+
+[*.{s,c,py}]
+charset = utf-8
+ident_style = tab
+indent_size = 4
+trim_trailing_whitespace = true
+

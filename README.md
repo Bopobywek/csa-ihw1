@@ -154,3 +154,24 @@ grep -c ../logs/log_optimized -e "\bCorrect"
 </p>
 
 Сам лог: [log_optimized](https://github.com/Bopobywek/csa-ihw1/blob/main/logs/log_optimized)
+
+## Критерии на 7 баллов
+### Модульная программа
+Единицы компиляции располагаются в папке [modules](https://github.com/Bopobywek/csa-ihw1/tree/main/modules)
+
+Сборка программы:
+```
+make obj
+make program
+```
+<p align="center">
+  <img src="https://github.com/Bopobywek/csa-ihw1/blob/main/screenshots/make_program.jpg">
+</p>
+
+### Ввод и вывод в файл
+Ввод и вывод в файл осуществляется с помощью опций `-i` и `-o` соответсвенно
+
+<p align="center">
+  <img src="https://github.com/Bopobywek/csa-ihw1/blob/main/screenshots/file_in_out.jpg">
+</p>
+

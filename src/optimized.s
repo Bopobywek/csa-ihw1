@@ -148,7 +148,7 @@ readArraySizeFromConsole:
 	push	rbp                     # |
 	mov	rbp, rsp                    # | Пролог
 	push r12
-	sub	rsp, 8                     # |
+	sub	rsp, 8                      # |
 
 	mov	r12, rdi      				# | r12 := rdi <=> r12 := size -- кладём в регистр первый аргумент (указатель на число)
 	mov	rax, r12      				# | rax := r12 <=> rax := size -- теперь в rax лежит int *size
@@ -179,7 +179,7 @@ readArraySizeFromConsole:
 
 
 # ^
-# Использование стека удалось сократить, однако перед вызывом функции из libc, пришлось сохранить значение регистра на стек
+# Использование стека удалось сократить, используем регистр r12
 #
 
     .globl	readArraySizeFromFile
@@ -236,13 +236,13 @@ readArrayFromConsole:
 	push	rbp                     # |
 	mov	rbp, rsp                    # | Пролог функции
 	push r12
-	push r13
+	push r13						# | <= не портим callee-saved регистры
 	push r14
 	push r15
 	sub	rsp, 32                     # |
 	
 	mov	r14, rdi     				# | r14 := rdi <=> r14 = array -- загружаем в регистр первый аргумент (указатель на начало массива)
-	mov	r13d, esi     				# | r13d := esi <=> r13d = size -- загружаем на стек второй переданный аргумент (размер массива)
+	mov	r13d, esi     				# | r13d := esi <=> r13d = size -- загружаем в регистр второй переданный аргумент (размер массива)
 	mov	r12d, 0        				# | r12d := 0 <=> int i = 0 // Заводим счётчик
 	jmp	.L22						# | Переходим на метку, в которой проверяется условие цикла
 .L23:
@@ -279,10 +279,10 @@ readArrayFromFile:
 	mov	rbp, rsp                    # | Пролог
 	sub	rsp, 48                     # |
 	
-	mov	r12, rdi     # | rbp[-24] := rdi <=> rbp[-24] := fin -- загружаем на стек первый аргумент (указатель на FILE)
-	mov	r13, rsi     # | rbp[-32] := rsi <=> rbp[-32] := array -- загружаем на стек второй аргумент (указатель на начало массива)
-	mov	r14d, edx     # | rbp[-36] := edx <=> rbp[-36] := size -- загружаем на стек третий аргумент (размер массива)
-	cmp	r12, 0       # | Сравниваем fin (rbp[-24]) и NULL (0)
+	mov	r12, rdi     				# | r12 := rdi <=> r12 := fin -- загружаем в регистр первый аргумент (указатель на FILE)
+	mov	r13, rsi     				# | r13 := rsi <=> r13 := array -- загружаем в регистр второй аргумент (указатель на начало массива)
+	mov	r14d, edx     				# | r14d := edx <=> r14d := size -- загружаем в регистр третий аргумент (размер массива)
+	cmp	r12, 0       				# | Сравниваем fin (r12) и NULL (0)
 	jne	.L26						# | Если fin не NULL, идем дальше -- на метку .L26
 	mov	eax, 1						# | Иначе кладем в eax 1 для возврата.
 	jmp	.L27						# | И прыгаем на метку .L27 -- эпилог функции
@@ -303,13 +303,16 @@ readArrayFromFile:
 	add	DWORD PTR -4[rbp], 1		# | ++i
 .L28:
 	mov	eax, DWORD PTR -4[rbp]      # | eax := i // rbp[-4] = i
-	cmp	eax, r14d     # | Сравниваем i (eax) и size (rbp[-36])
+	cmp	eax, r14d     				# | Сравниваем i (eax) и size (r14d)
 	jl	.L29						# | Если i < size, прыгаем на метку .L29 -- тело цикла
 	mov	eax, 0						# | Иначе возвращаем 0 -- знак, что всё прошло без ошибок
 .L27:
 	leave                           # | Эпилог функции
 	ret                             # \
-	
+
+# ^
+# Вместо стека теперь используем регистры r12, r13, r14
+
 	.section	.rodata
 .LC1:
 	.string	"%d "
@@ -322,25 +325,25 @@ writeArrayToConsole:
 	mov	rbp, rsp                    # | Пролог
 	sub	rsp, 32                     # |
 	
-	mov	r12, rdi     # | rbp[-24] := rdi // Загружаем на стек первый аргумент -- указатель на начало массива int *array
-	mov	r13d, esi     # | rbp[-28] := esi // Загружаем на стек второй аргумент -- размер массива int size
-	mov	r14d, 0        # | rbp[-4] := 0 <=> int i = 0 // Запомним, что rbp[-4] = i
+	mov	r12, rdi     				# | r12 := rdi // Загружаем в регистр первый аргумент -- указатель на начало массива int *array
+	mov	r13d, esi     				# | r13d := esi // Загружаем в регистр второй аргумент -- размер массива int size
+	mov	r14d, 0        				# | r14d := 0 <=> int i = 0 // Запомним, что r14d = i
 	jmp	.L31						# | Переходим на метку .L31, в которой проверится условие выхода из цикла
 .L32:
-	mov	eax, r14d      # | eax := i
+	mov	eax, r14d      				# | eax := i
 	cdqe                            # | rax := sign-extend of eax. Копирует знак (31 бит) в старшие 32 бита регистра rax
 	lea	rdx, 0[0+rax*4]             # | rdx := rax * 4 // Подобным трюком вычисляется адрес (rax*4)[0], который равен rax * 4
-	mov	rax, r12     # | rax := array -- указатель на начало массива
+	mov	rax, r12     				# | rax := array -- указатель на начало массива
 	add	rax, rdx                    # | rax := rax + rdx -- вычисляем адрес i-ого элемента массива
 	mov	eax, DWORD PTR [rax]        # | eax := *(rax) <=> eax := array[i]
 	mov	esi, eax                    # | esi := eax -- второй аргумент (array[i]) для вызова printf   
 	lea	rdi, .LC1[rip]              # | rdi := &rip[.LC1] -- первый аргумент (адрес начала форматной строки) для вызова printf
 	mov	eax, 0                      # | eax := 0
 	call	printf@PLT              # | Вызываем printf(rdi=&rip[.LC1], rsi=array[i])
-	add	r14d, 1        # | ++i
+	add	r14d, 1        				# | ++i
 .L31:
-	mov	eax, r14d      # | eax := i
-	cmp	eax, r13d     # | Сравниваем i (eax) и size (rbp[-28])
+	# mov	eax, r14d     <===    теперь не нужно 	
+	cmp	r14d, r13d     				# | Сравниваем i (r14d) и size (r13d)
 	jl	.L32						# | Если i < size, переходим к следующей итерации цикла
 	mov	edi, 10                     # | Иначе edi := 10 -- первый аргумент для вызова putchar (записывает единственный char в поток вывода)
 	call	putchar@PLT             # | Вызываем putchar(edi=10) // 10 = '\n'
@@ -349,6 +352,8 @@ writeArrayToConsole:
     leave                           # | Эпилог
 	ret                             # \
 
+# ^
+# Вместо стека теперь используем регистры r12, r13, r14
 
 	.globl	writeArrayToFile
 	.type	writeArrayToFile, @function
@@ -358,34 +363,34 @@ writeArrayToFile:
 	mov	rbp, rsp                    # | Пролог
 	sub	rsp, 48                     # |
 	
-	mov	r12, rdi     # | rbp[-24] := rdi -- первый переданный аргумент (FILE *fout) загружаем на стек 
-	mov	r13, rsi     # | rbp[-32] := rsi -- загружаем на стек второй переданный аргумент (int *array -- указатель на начало массива)
-	mov	r15d, edx     # | rbp[-36] := edx -- загружаем на стек третий переданный аргумент (int size -- размер массива)
-	cmp	r12, 0       # | Сравниваем fout (rbp[-24]) и NULL (0)
+	mov	r12, rdi     				# | r12 := rdi -- первый переданный аргумент (FILE *fout) загружаем в регистр
+	mov	r13, rsi     				# | r13 := rsi -- загружаем  в регистр второй переданный аргумент (int *array -- указатель на начало массива)
+	mov	r15d, edx     				# | r15d := edx -- загружаем  в регистр третий переданный аргумент (int size -- размер массива)
+	cmp	r12, 0       				# | Сравниваем fout (r12) и NULL (0)
 	jne	.L35						# | Если fout не NULL, переходим к метке .L35
 	mov	eax, 1                      # | Иначе возвращаем 1 через eax
 	jmp	.L36						# | И прыгаем на эпилог
 .L35:
-	mov	r14d, 0        # | rbp[-4] = 0 <=> int i = 0		
+	mov	r14d, 0        				# | r14d = 0 <=> int i = 0		
 	jmp	.L37						# | Переходим на метку .L37
 .L38:
-	mov	eax, r14d      # | eax := i
+	mov	eax, r14d      				# | eax := i
 	cdqe                            # | rax := sign-extend of eax. Копирует знак (31 бит) в старшие 32 бита регистра rax
 	lea	rdx, 0[0+rax*4]             # | rdx := rax * 4 // Подобным трюком вычисляется адрес (rax*4)[0], который равен rax * 4
-	mov	rax, r13     # | rax := array
+	mov	rax, r13     				# | rax := array
 	add	rax, rdx                    # | rax := rax + rdx // rax := &array[i]
 	mov	edx, DWORD PTR [rax]        # | edx := [rax] <=> edx := *(rax + rdx) = array[i] -- третий аргумент для вызова fprintf
-	mov	rax, r12     # | rax := fout
+	mov	rax, r12     				# | rax := fout
 	lea	rsi, .LC1[rip]              # | rsi := &rip[.LC1] -- второй аргумент для вызова fprintf (форматная строка)
 	mov	rdi, rax                    # | rdi := rax = fout -- первый аргумент для вызова fprintf 
 	mov	eax, 0                      # | eax := 0
 	call	fprintf@PLT             # | Вызываем fprintf(rdi=fout, rsi=&rip[.LC1], rdx=array[i])
-	add	r14d, 1        # | ++i
+	add	r14d, 1        				# | ++i
 .L37:
-	mov	eax, r14d      # | eax := i
-	cmp	eax, r15d     # | Сравниваем eax (i) и size (rbp[-36])
+	mov	eax, r14d      				# | eax := i
+	cmp	eax, r15d     				# | Сравниваем eax (i) и size (r15d)
 	jl	.L38						# | Если i < size, переходим к следующей итерации цикла
-	mov	rax, r12     # | Иначе rax := fout
+	mov	rax, r12     				# | Иначе rax := fout
 	mov	rsi, rax                    # | rsi := rax -- второй аргумент (fout) для вызова fputc
 	mov	edi, 10                     # | edi := 10 -- первый аргумент (10 = '\n') для вызова fputc
 	call	fputc@PLT               # | Вызываем fputc(rdi='\n', rsi=fout)
@@ -393,6 +398,8 @@ writeArrayToFile:
 .L36:
 	leave                           # | Эпилог
 	ret                             # \
+# ^
+# Вместо стека теперь используем регистры r12, r13, r14, r15
 
 	.globl	getRandomArraySize
 	.type	getRandomArraySize, @function
@@ -429,15 +436,15 @@ fillArrayWithRandom:
 	push	rbp                     # |
 	mov	rbp, rsp                    # | Пролог
 	push	r13
-	push	rbx						# | Зачем-то на стек сохраняется rbx, который потом нигде всё равно не используются. Загадка...
-	sub	rsp, 40						# |
+	push	rbx						# | Зачем-то в регистр сохраняется rbx, который потом нигде всё равно не используются. Загадка...
+	sub	rsp, 40						# | UPD: теперь ясно зачем... callee-saved регистры
 	
-	mov	r14, rdi		# | rbp[-40] := rdi = int *array
-	mov	r12d, esi		# |	rbp[-44] := esi = int size
-	mov	r13d, 0		# | rbp[-20] := 0 = i // Заводим счётчик цикла
+	mov	r14, rdi					# | r14 := rdi = int *array
+	mov	r12d, esi					# |	r12d := esi = int size
+	mov	r13d, 0						# | r13d := 0 = i // Заводим счётчик цикла
 	jmp	.L42						# | Переходим к проверке условия выхода из цикла
 .L45:
-	mov	eax, r13d		# | eax := rbp[-20] = i
+	mov	eax, r13d					# | eax := r13d = i
 	lea	ecx, 1[rax]					
 	movsx	rax, ecx
 	imul	rax, rax, 1431655766
@@ -455,10 +462,10 @@ fillArrayWithRandom:
 	sub	eax, edx
 	test	eax, eax
 	jne	.L43
-	mov	eax, r13d		# |
+	mov	eax, r13d					# |
 	cdqe							# |
 	lea	rdx, 0[0+rax*4]				# |
-	mov	rax, r14		# |
+	mov	rax, r14					# |
 	add	rax, rdx					# | 
 	mov	DWORD PTR [rax], 0			# | <=> array [i] = 0
 	jmp	.L44
@@ -498,8 +505,8 @@ fillArrayWithRandom:
 .L44:
 	add	r13d, 1
 .L42:
-	mov	eax, r13d		# eax := rbp[-20] = i
-	cmp	eax, r12d		# Сравниваем i (eax) и size (rbp[-44])
+	mov	eax, r13d					# eax := r13d = i
+	cmp	eax, r12d					# Сравниваем i (eax) и size (r12d)
 	jl	.L45						# Если i < size, переходим к следующей итерации цикла
 	
 	add	rsp, 40						# |
@@ -507,7 +514,9 @@ fillArrayWithRandom:
 	pop	r13
 	pop	rbp							# |
 	ret								# \ 
-	
+# ^
+# Вместо стека теперь используем регистры r12, r13, r14
+
 	.section	.rodata
 .LC2:
 	.string	"Incorrect input file"
@@ -522,13 +531,13 @@ isFilesValid:
 	mov	rbp, rsp                    # | Пролог
 	sub	rsp, 32						# |
 	
-	mov	r12d, edi		# | Загружаем первый переданный аргумент int flag_in на стек. rbp[-4] := edi = flag_in
-	mov	r13d, esi		# | Загружаем второй переданный аргумент int flag_in на стек. rbp[-8] := esi = flag_out
-	mov	r14, rdx		# | rbp[-16] := rdx = input -- аналогично загружаем на стек третий переданный агрумент (указатель на FILE)
-	mov	r15, rcx		# | Загружаем на стек 4 переданный аргумент FILE *output. rbp[-24] := rcx = output
-	cmp	r12d, 1		# | Сравниваем flag_in (rbp[-4]) и 1
+	mov	r12d, edi					# | Загружаем первый переданный аргумент int flag_in в регистр. r12d := edi = flag_in
+	mov	r13d, esi					# | Загружаем второй переданный аргумент int flag_in в регистр. r13d := esi = flag_out
+	mov	r14, rdx					# | r14 := rdx = input -- аналогично загружаем в регистр третий переданный агрумент (указатель на FILE)
+	mov	r15, rcx					# | Загружаем в регистр 4 переданный аргумент FILE *output. r15 := rcx = output
+	cmp	r12d, 1						# | Сравниваем flag_in (r12d) и 1
 	jne	.L47						# | Если не равны, && не является истинной, поэтому прыгаем на метку .L47 -- следующий if
-	cmp	r14, 0		# | Иначе сравниваем input (rbp[-16]) и NULL (0)
+	cmp	r14, 0						# | Иначе сравниваем input (r14) и NULL (0)
 	jne	.L47						# | Если не равны, && не является истинной, поэтому прыгаем на метку .L47 -- следующий if
 	lea	rdi, .LC2[rip]				# | Иначе, загружаем в rdi первый аргумент для вызова printf -- адрес на начало строки для печати: rdi := &rip[.LC2]
 	mov	eax, 0						# | eax := 0
@@ -536,9 +545,9 @@ isFilesValid:
 	mov	eax, 1						# | Возвращаем через eax 1 -- знак того, что файл не является валидным
 	jmp	.L48						# | Переходим на метку с эпилогом
 .L47:
-	cmp	r13d, 1		# | Сравниваем flag_out (rbp[-8]) и 1
+	cmp	r13d, 1						# | Сравниваем flag_out (r13d) и 1
 	jne	.L49						# | Если не равны, && не является истинной, переходим на метку с возвратом
-	cmp	r15, 0		# | Иначе сравниваем output (rbp[-24]) и NULL (0)
+	cmp	r15, 0						# | Иначе сравниваем output (r15) и NULL (0)
 	jne	.L49						# | Если не равны, && не является истинной, переходим на метку с возвратом
 	lea	rdi, .LC3[rip]				# | Иначе загружаем в rdi первый аргумент для вызова printf -- адрес на начало строки для печати
 	mov	eax, 0						# | eax := 0
@@ -550,7 +559,8 @@ isFilesValid:
 .L48:
 	leave                           # | Эпилог
 	ret                             # \
-	
+# ^
+# Вместо стека теперь используем регистры r12, r13, r14, r15
 	.section	.rodata
 .LC4:
 	.string	"Incorrect size of array"
@@ -565,9 +575,9 @@ validateInput:
 	mov	rbp, rsp                    # | Пролог
 	sub	rsp, 16						# | 
 	
-	mov	r12d, edi		# | rbp[-4] := edi = int code1 -- первый входной параметр загружаем на стек
-	mov	r13d, esi		# |rbp[-4] := esi = int code2 -- второй входной параметр загружаем на стек
-	cmp	r12d, 1		# | Сравниваем code1 (rbp[-4]) и 1
+	mov	r12d, edi					# | r12d := edi = int code1 -- первый входной параметр загружаем в регистр
+	mov	r13d, esi					# | r13d := esi = int code2 -- второй входной параметр загружаем в регистр
+	cmp	r12d, 1						# | Сравниваем code1 (r12d) и 1
 	jne	.L51						# | Если не равны, переходим к следующему if
 	lea	rdi, .LC4[rip]				# | Иначе загружаем в rdi адрес на начало строки для печати -- первый аргумент для вызова printf: rdi = &rip[.LC4]
 	mov	eax, 0						# | eax := 0
@@ -575,9 +585,9 @@ validateInput:
 	mov	eax, 1						# | Возвращаем 1 через eax // return 1;
 	jmp	.L52						# | Переходим к эпилогу
 .L51:
-	cmp	r13d, 1		# | Сравниваем code2 (rbp[-8]) и 1
+	cmp	r13d, 1						# | Сравниваем code2 (r13d) и 1
 	jne	.L53						# | Если не равны, переходим к возврату 0 
-	lea	rdi, .LC5[rip]				# # | Иначе загружаем в rdi адрес на начало строки для печати -- первый аргумент для вызова printf: rdi = &rip[.LC5]
+	lea	rdi, .LC5[rip]				# | Иначе загружаем в rdi адрес на начало строки для печати -- первый аргумент для вызова printf: rdi = &rip[.LC5]
 	mov	eax, 0						# | eax := 0
 	call	printf@PLT				# | Вызываем printf(rdi=&rip[.LC4])
 	mov	eax, 1						# | Возвращаем 1 через eax // return 1;
@@ -587,7 +597,8 @@ validateInput:
 .L52:
 	leave                           # | Эпилог
 	ret                             # \
-	
+# ^
+# Вместо стека теперь используем регистры r12, r13	
 	.globl	handleFileInput
 	.type	handleFileInput, @function
 handleFileInput:
@@ -596,36 +607,37 @@ handleFileInput:
 	mov	rbp, rsp                    # | Пролог
 	sub	rsp, 32						# |
 	
-	mov	r15, rdi		# | rbp[-24] := rdi = FILE *input -- первый входной параметр загружаем на стек
-	mov	r14, rsi		# | rbp[-32] := rsi = int *size -- второй входной параметр загружаем на стек
-	mov	rdx, r14		# | rdx := rbp[-32] = size
-	mov	rax, r15		# | rax := rbp[-24] = input
+	mov	r15, rdi					# | r15 := rdi = FILE *input -- первый входной параметр загружаем в регистр
+	mov	r14, rsi					# | r14 := rsi = int *size -- второй входной параметр загружаем в регистр
+	mov	rdx, r14					# | rdx := r14 = size
+	mov	rax, r15					# | rax := r15 = input
 	mov	rsi, rdx					# |	rsi := rdx = size
 	mov	rdi, rax					# |	rdi := rax = input
 	call	readArraySizeFromFile   # | Вызываем readArraySizeFromFile(rdi=input, rsi=size)
 	
-	mov	ebx, eax		# | rbp[-4] := eax <=> int code1 = возвращенное значение от readArraySizeFromFile
-	mov	rax, r14		# | rax := rbp[-32] = size
+	mov	ebx, eax					# | r14 := eax <=> int code1 = возвращенное значение от readArraySizeFromFile
+	mov	rax, r14					# | rax := r14 = size
 	mov	edx, DWORD PTR [rax]		# | edx := [rax] = *size
-	mov	rax, r15		# |	rax := rbp[-24] = input
+	mov	rax, r15					# |	rax := r15 = input
 	lea	rsi, A[rip]					# |	rsi := &rip[A] -- адрес на начало массива A
 	mov	rdi, rax					# | rdi := rax = input
 	call	readArrayFromFile		# | Вызываем readArrayFromFile(rdi=input, rsi=&rip[A], edx=*size)
 	
-	mov	r12d, eax		# | rbp[-8] := eax <=> int code1 = возвращенное значение от readArraySizeFromFile
-	mov	rax, r15		# | rax := rbp[-24] = input
+	mov	r12d, eax					# | r12d := eax <=> int code1 = возвращенное значение от readArraySizeFromFile
+	mov	rax, r15					# | rax := r15 = input
 	mov	rdi, rax					# |	rdi := rax = input
 	call	fclose@PLT				# | Вызываем fclose(rdi=input)
 	
-	mov	edx, r12d		# | edx := rbp[-8] = code1
-	mov	eax, ebx		# | eas := rbp[-4] = code2
+	mov	edx, r12d					# | edx := r12d = code1
+	mov	eax, ebx					# | eas := r14 = code2
 	mov	esi, edx					# |	esi := edx = code2
 	mov	edi, eax					# | edi := eax = code1
 	call	validateInput			# | Вызываем validateInput(edi=code1, esi=code2)
 									# | Значение возвращаем через eax так же, как и validateInput, поэтому ничего не делаем и переходим к эпилогу 
 	leave							# | Эпилог
 	ret								# \
-	
+# ^
+# Вместо стека теперь используем регистры r12, r14, r15	
 	.section	.rodata
 	.align 8
 .LC6:
@@ -642,35 +654,36 @@ handleConsoleInput:
 	mov	rbp, rsp                    # | Пролог
 	sub	rsp, 32						# |
 	
-	mov	r13, rdi		# | rbp[-24] := rdi = int *size -- первый входной параметр загружаем на стек
+	mov	r13, rdi					# | r13 := rdi = int *size -- первый входной параметр загружаем в регистр
 	lea	rdi, .LC6[rip]				# | rdi := &rip[.LC6] -- адрес начала строки для печати
 	mov	eax, 0						# | eax := 0
 	call	printf@PLT				# | Вызываем printf(rdi=&rip[.LC6])
 	
-	mov	rax, r13		# | rax := size
+	mov	rax, r13					# | rax := size
 	mov	rdi, rax					# | rdi := rax = size
 	call	readArraySizeFromConsole # \ Вызываем readArraySizeFromConsole(rdi=size)	
 	
-	mov	r15d, eax		#  / rbp[-4] := eax <=> int code1 = возвращенное значение от readArraySizeFromConsole(rdi=size)
+	mov	r15d, eax					#  / r15d := eax <=> int code1 = возвращенное значение от readArraySizeFromConsole(rdi=size)
 	lea	rdi, .LC7[rip]				# | rdi := &rip[.LC7] -- адрес начала строки для печати
 	call	puts@PLT				# | Вызываем puts(rdi=&rip[.LC7])
 	
-	mov	rax, r13		# | rax := rbp[-24] = size
+	mov	rax, r13					# | rax := r13 = size
 	mov	eax, DWORD PTR [rax]		# | eax := [rax] = *size
 	mov	esi, eax					# | esi := eax = *size
 	lea	rdi, A[rip]					# | rdi := &rip[A] -- адре на начало массива A
 	call	readArrayFromConsole	# | Вызываем readArrayFromConsole(rdi=&rip[A], esi=*size)
 	
-	mov	r14d, eax		# | rbp[-8] := eax <=> int code2 = возвращенное значение от readArrayFromConsole(rdi=&rip[A], esi=*size)
-	mov	edx, r14d		# | edx := rbp[-8] = code2
-	mov	eax, r15d		# | eax := rbp[-4] = code1
+	mov	r14d, eax					# | r14d := eax <=> int code2 = возвращенное значение от readArrayFromConsole(rdi=&rip[A], esi=*size)
+	mov	edx, r14d					# | edx := r14d = code2
+	mov	eax, r15d					# | eax := r15d = code1
 	mov	esi, edx					# | esi := edx = code2
 	mov	edi, eax					# | edi := eax = code1
 	call	validateInput			# | Вызываем validateInput(edi=code1, esi=code2)
 									# | Значение возвращаем через eax так же, как и validateInput, поэтому ничего не делаем и переходим к эпилогу 
 	leave							# | Эпилог
 	ret								# \
-	
+# ^
+# Вместо стека теперь используем регистры r13, r14, r15	
 	.section	.rodata
 .LC8:
 	.string	"Random array with size %d:\n"
@@ -683,31 +696,31 @@ handleRandomInput:
 	mov	rbp, rsp                    # | Пролог
 	sub	rsp, 32						# |
 	
-	mov	rbx, rdi		# | rbp[-8] := rdi = int *size -- первый входной параметр загружаем на стек
-	mov	r15, rsi		# | rbp[-16] := rsi = FILE *output -- второй входной параметр загружаем на стек
-	mov	r13d, edx		# |	rbp[-20] := edx = int flag_file_out -- третий входной параметр загружаем на стек
+	mov	rbx, rdi					# | rbx := rdi = int *size -- первый входной параметр загружаем в регистр
+	mov	r15, rsi					# | r15 := rsi = FILE *output -- второй входной параметр загружаем в регистр
+	mov	r13d, edx					# |	r13d := edx = int flag_file_out -- третий входной параметр загружаем в регистр
 	mov	eax, 0						# | eax := 0
 	call	getRandomArraySize		# | Вызываем getRandomArraySize()
 	
-	mov	rdx, rbx		# | rdx := rbp[-8] = size
+	mov	rdx, rbx					# | rdx := rbx = size
 	mov	DWORD PTR [rdx], eax		# |	[rdx] := eax <=> *size = getRandomArraySize()
-	mov	rax, rbx		# | rax := rbp[-8] = size
+	mov	rax, rbx					# | rax := rbx = size
 	mov	eax, DWORD PTR [rax]		# | eax := [rax] = *size
 	mov	esi, eax					# |	esi := eax = *size
 	lea	rdi, A[rip]					# | rdi := &rip[A] -- адрес на начало массива A
 	call	fillArrayWithRandom		# | fillArrayWithRandom(rdi=&rip[A], esi=*size)
 	
-	cmp	r13d, 0		# | Сравниваем flag_file_out(rbp[-20) и 0
+	cmp	r13d, 0						# | Сравниваем flag_file_out(rbp[-20) и 0
 	jne	.L59						# |	Если не равны, переходим к else на метку .L59
 	
-	mov	rax, rbx		# | rax := rbp[-8] = size
+	mov	rax, rbx					# | rax := rbx = size
 	mov	eax, DWORD PTR [rax]		# | eax := [rax] = *size
 	mov	esi, eax					# | esi := eax
 	lea	rdi, .LC8[rip]				# | rdi := &rip[.LC8] -- адрес начала строки для печати
 	mov	eax, 0						# | eax := 0
 	call	printf@PLT				# | printf(rdi=&rip[.LC8], esi=*size)
 	
-	mov	rax, rbx		# | rax := rbp[-8] = size
+	mov	rax, rbx					# | rax := rbx = size
 	mov	eax, DWORD PTR [rax]		# | eax := [rax] = *size
 	mov	esi, eax					# | esi := eax
 	lea	rdi, A[rip]					# | rdi = &rip[A] -- адрес начала массива A
@@ -716,9 +729,9 @@ handleRandomInput:
 	jmp	.L60						# | Переходим на метку с эпилогом
 
 .L59:								# | else				
-	mov	rax, rbx		# | rax := rbp[-8] = size
+	mov	rax, rbx		# | rax := rbx = size
 	mov	edx, DWORD PTR [rax]		# | edx := [rax] = *size
-	mov	rax, r15		# | rax := rbp[-16] = output
+	mov	rax, r15		# | rax := r15 = output
 	lea	rsi, A[rip]					# | rsi := &rip[A] -- адрес начала массива
 	mov	rdi, rax					# | rdi := rax
 	call	writeArrayToFile		# | writeArrayToFile(rdi=output, rsi=&rip[A], edx=*size)
@@ -727,7 +740,9 @@ handleRandomInput:
 	
 	leave							# | Эпилог
 	ret								# \
-	
+# ^
+# Вместо стека теперь используем регистры rbx, r13, r15	
+
 	.globl	getTimeDiff
 	.type	getTimeDiff, @function
 getTimeDiff:
@@ -735,24 +750,22 @@ getTimeDiff:
 	push	rbp                     # |
 	mov	rbp, rsp                    # | Пролог
 	
-									# | Блок со странными обменами
+									
 	mov	rax, rsi					# | rax := rsi = ts1.tv_nsec
 	mov	r8, rdi						# | r8 := rdi = ts1.tv_sec
 	mov	rsi, r8						# | rsi := r8 = ts1.tv_sec
-	mov	rdi, r9						# | rdi := r9 // ?????
-	mov	rdi, rax					# | rdi := rax = ts1.tv_nsec 
-	# Вообще странная штука, поменяли местами rdi и rsi, с лишним действием...
-	# При сокращении кода можно попробовать удалить
+	mov	rdi, r9						# | rdi := r9
+	mov	rdi, rax					# | rdi := rax = ts1.tv_nsec
 	
-	mov	r12, rsi		# | rbp[-32] := rsi = ts1.tv_sec
-	mov	r13, rdi		# | rbp[-24] := rsi = ts1.tv_nsec
-	mov	r14, rdx		# | rbp[-48] := rdx = ts2.tv_sec
-	mov	r15, rcx		# | rbp[-40] := rdx = ts2.tv_nsec
+	mov	r12, rsi					# | r12 := rsi = ts1.tv_sec
+	mov	r13, rdi					# | r13 := rsi = ts1.tv_nsec
+	mov	r14, rdx					# | r14 := rdx = ts2.tv_sec
+	mov	r15, rcx					# | r15 := rdx = ts2.tv_nsec
 	
 	
-	mov	rax, r12		# | rax := rbp[-32] = ts1.tv_sec
+	mov	rax, r12					# | rax := r12 = ts1.tv_sec
 	imul	rsi, rax, 1000			# | rsi := rax * 1000 = ts1.tv_sec * 1000
-	mov	rcx, r13		# | rcx := rbp[-24] = ts1.tv_nsec
+	mov	rcx, r13					# | rcx := r13 = ts1.tv_nsec
 	movabs	rdx, 4835703278458516699 # \ Второй операнд очень похож на константу 1000000.
 	mov	rax, rcx					#  / rax := rcx = ts1.tv_nsec
 	imul	rdx						# | rdx:rax := rax * rdx
@@ -763,9 +776,9 @@ getTimeDiff:
 	mov	rax, rdx					# |
 	add	rax, rsi					# | rax := rax + rsi
 	mov	QWORD PTR -8[rbp], rax		# | rbp[-8] := rax = ts1_ms
-	mov	rax, r14     # | rax := rbp[-48] = ts2.tv_sec
+	mov	rax, r14     				# | rax := r14 = ts2.tv_sec
 	imul	rsi, rax, 1000			# |	rsi := rax * 1000
-	mov	rcx, r15		# \ rcx := rbp[-40] = ts2.tv_nsec
+	mov	rcx, r15					# \ rcx := r15 = ts2.tv_nsec
 	movabs	rdx, 4835703278458516699 # | Снова арифметика
 	mov	rax, rcx					# /	
 	imul	rdx						# |	
@@ -782,7 +795,8 @@ getTimeDiff:
 									
 	pop	rbp							# | Эпилог			
 	ret								# \
-	
+# ^
+# Вместо стека теперь используем регистры r12, r13, r14, r15	
 	.globl	measureTime
 	.type	measureTime, @function
 measureTime:

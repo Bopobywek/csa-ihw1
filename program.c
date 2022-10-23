@@ -162,7 +162,7 @@ int handleRandomInput(int *size, FILE *output, int flag_file_out) {
         printf("Random array with size %d:\n", *size);
         writeArrayToConsole(A, *size);
     } else {
-        writeArrayToFile(output, B, *size);
+        writeArrayToFile(output, A, *size);
     }
 
     return 0;
@@ -178,15 +178,18 @@ int64_t getTimeDiff(struct timespec ts1, struct timespec ts2) {
 int64_t measureTime() {
     struct timespec start;
     struct timespec end;
+	int64_t elapsed = 0;
 
-    clock_gettime(CLOCK_MONOTONIC, &start);
     for (int i = 0; i < SAMPLE_SIZE; ++i) {
         fillArrayWithRandom(A, MAX_N);
+		clock_gettime(CLOCK_MONOTONIC, &start);
         makeB(MAX_N);
+		clock_gettime(CLOCK_MONOTONIC, &end);
+		elapsed += getTimeDiff(end, start);
     }
-    clock_gettime(CLOCK_MONOTONIC, &end);
+    
 
-    return getTimeDiff(end, start);
+    return elapsed;
 }
 
 int main(int argc, char *argv[]) {

@@ -229,7 +229,7 @@ readArrayFromConsole:
 	sub	rsp, 32                     # |
 	
 	mov	QWORD PTR -24[rbp], rdi     # | rbp[-24] := rdi <=> rbp[-24] = array -- загружаем на стек первый аргумент (указатель на начало массива)
-	mov	DWORD PTR -28[rbp], esi     # | rbp[-28] := esi <=> rbp[-28] = size -- загружаем на стек второй переданный аргумент (размер масива)
+	mov	DWORD PTR -28[rbp], esi     # | rbp[-28] := esi <=> rbp[-28] = size -- загружаем на стек второй переданный аргумент (размер массива)
 	mov	DWORD PTR -4[rbp], 0        # | rbp[-4] := 0 <=> int i = 0 // Заводим счётчик
 	jmp	.L22						# | Переходим на метку, в которой проверяется условие цикла
 .L23:
@@ -411,13 +411,13 @@ fillArrayWithRandom:
 	push	rbx						# | Зачем-то на стек сохраняется rbx, который потом нигде всё равно не используются. Загадка...
 	sub	rsp, 40						# |
 	
-	mov	QWORD PTR -40[rbp], rdi		# |
-	mov	DWORD PTR -44[rbp], esi		# |
-	mov	DWORD PTR -20[rbp], 0		# |
-	jmp	.L42
+	mov	QWORD PTR -40[rbp], rdi		# | rbp[-40] := rdi = int *array
+	mov	DWORD PTR -44[rbp], esi		# |	rbp[-44] := esi = int size
+	mov	DWORD PTR -20[rbp], 0		# | rbp[-20] := 0 = i // Заводим счётчик цикла
+	jmp	.L42						# | Переходим к проверке условия выхода из цикла
 .L45:
-	mov	eax, DWORD PTR -20[rbp]
-	lea	ecx, 1[rax]
+	mov	eax, DWORD PTR -20[rbp]		# | eax := rbp[-20] = i
+	lea	ecx, 1[rax]					
 	movsx	rax, ecx
 	imul	rax, rax, 1431655766
 	shr	rax, 32
@@ -434,16 +434,16 @@ fillArrayWithRandom:
 	sub	eax, edx
 	test	eax, eax
 	jne	.L43
-	mov	eax, DWORD PTR -20[rbp]
-	cdqe
-	lea	rdx, 0[0+rax*4]
-	mov	rax, QWORD PTR -40[rbp]
-	add	rax, rdx
-	mov	DWORD PTR [rax], 0
+	mov	eax, DWORD PTR -20[rbp]		# |
+	cdqe							# |
+	lea	rdx, 0[0+rax*4]				# |
+	mov	rax, QWORD PTR -40[rbp]		# |
+	add	rax, rdx					# | 
+	mov	DWORD PTR [rax], 0			# | <=> array [i] = 0
 	jmp	.L44
 .L43:
-	call	rand@PLT
-	movsx	rdx, eax
+	call	rand@PLT				# | Вызываем rand без аргуметов
+	movsx	rdx, eax				# | переносим возвращенное через eax значение в rdx sign-extend
 	imul	rdx, rdx, 1374389535
 	shr	rdx, 32
 	mov	ecx, edx
@@ -466,26 +466,27 @@ fillArrayWithRandom:
 	imul	edx, edx, 250
 	sub	eax, edx
 	mov	edx, eax
-	mov	eax, DWORD PTR -20[rbp]
-	cdqe
-	lea	rcx, 0[0+rax*4]
-	mov	rax, QWORD PTR -40[rbp]
-	add	rax, rcx
+	mov	eax, DWORD PTR -20[rbp]		# |
+	cdqe							# |
+	lea	rcx, 0[0+rax*4]				# | Вычисляем адрес i элемента массива
+	mov	rax, QWORD PTR -40[rbp]		# |
+	add	rax, rcx					# |
 	sub	ebx, edx
 	mov	edx, ebx
-	mov	DWORD PTR [rax], edx
+	mov	DWORD PTR [rax], edx		# | <=> array[i] := edx = (rand() % 200) - (rand() % 250)
 .L44:
 	add	DWORD PTR -20[rbp], 1
 .L42:
-	mov	eax, DWORD PTR -20[rbp]
-	cmp	eax, DWORD PTR -44[rbp]
-	jl	.L45
-	nop
-	nop
-	add	rsp, 40
-	pop	rbx
-	pop	rbp
-	ret
+	mov	eax, DWORD PTR -20[rbp]		# eax := rbp[-20] = i
+	cmp	eax, DWORD PTR -44[rbp]		# Сравниваем i (eax) и size (rbp[-44])
+	jl	.L45						# Если i < size, переходим к следующей итерации цикла
+	nop								# Выравнивание для оптимизации
+	nop								# Выравнивание для оптимизации
+	
+	add	rsp, 40						# |
+	pop	rbx							# |		Эпилог
+	pop	rbp							# |
+	ret								# \ 
 	.size	fillArrayWithRandom, .-fillArrayWithRandom
 	.section	.rodata
 .LC2:
@@ -496,38 +497,39 @@ fillArrayWithRandom:
 	.globl	isFilesValid
 	.type	isFilesValid, @function
 isFilesValid:
-	endbr64
-	push	rbp
-	mov	rbp, rsp
-	sub	rsp, 32
-	mov	DWORD PTR -4[rbp], edi
-	mov	DWORD PTR -8[rbp], esi
-	mov	QWORD PTR -16[rbp], rdx
-	mov	QWORD PTR -24[rbp], rcx
-	cmp	DWORD PTR -4[rbp], 1
-	jne	.L47
-	cmp	QWORD PTR -16[rbp], 0
-	jne	.L47
-	lea	rdi, .LC2[rip]
-	mov	eax, 0
-	call	printf@PLT
-	mov	eax, 1
-	jmp	.L48
+	endbr64                         # /
+	push	rbp                     # |
+	mov	rbp, rsp                    # | Пролог
+	sub	rsp, 32						# |
+	
+	mov	DWORD PTR -4[rbp], edi		# | Загружаем первый переданный аргумент int flag_in на стек. rbp[-4] := edi = flag_in
+	mov	DWORD PTR -8[rbp], esi		# | Загружаем второй переданный аргумент int flag_in на стек. rbp[-8] := esi = flag_out
+	mov	QWORD PTR -16[rbp], rdx		# | rbp[-16] := rdx = input -- аналогично загружаем на стек третий переданный агрумент (указатель на FILE)
+	mov	QWORD PTR -24[rbp], rcx		# | Загружаем на стек 4 переданный аргумент FILE *output. rbp[-24] := rcx = output
+	cmp	DWORD PTR -4[rbp], 1		# | Сравниваем flag_in (rbp[-4]) и 1
+	jne	.L47						# | Если не равны, && не является истинной, поэтому прыгаем на метку .L47 -- следующий if
+	cmp	QWORD PTR -16[rbp], 0		# | Иначе сравниваем input (rbp[-16]) и NULL (0)
+	jne	.L47						# | Если не равны, && не является истинной, поэтому прыгаем на метку .L47 -- следующий if
+	lea	rdi, .LC2[rip]				# | Иначе, загружаем в rdi первый аргумент для вызова printf -- адрес на начало строки для печати: rdi := &rip[.LC2]
+	mov	eax, 0						# | eax := 0
+	call	printf@PLT				# | Вызываем printf(rdi=&rip[.LC2])
+	mov	eax, 1						# | Возвращаем через eax 1 -- знак того, что файл не является валидным
+	jmp	.L48						# | Переходим на метку с эпилогом
 .L47:
-	cmp	DWORD PTR -8[rbp], 1
-	jne	.L49
-	cmp	QWORD PTR -24[rbp], 0
-	jne	.L49
-	lea	rdi, .LC3[rip]
-	mov	eax, 0
-	call	printf@PLT
-	mov	eax, 1
-	jmp	.L48
+	cmp	DWORD PTR -8[rbp], 1		# | Сравниваем flag_out (rbp[-8]) и 1
+	jne	.L49						# | Если не равны, && не является истинной, переходим на метку с возвратом
+	cmp	QWORD PTR -24[rbp], 0		# | Иначе сравниваем output (rbp[-24]) и NULL (0)
+	jne	.L49						# | Если не равны, && не является истинной, переходим на метку с возвратом
+	lea	rdi, .LC3[rip]				# | Иначе загружаем в rdi первый аргумент для вызова printf -- адрес на начало строки для печати
+	mov	eax, 0						# | eax := 0
+	call	printf@PLT				# | Вызываем printf(rdi=&rip[.LC3])
+	mov	eax, 1						# | Возвращаем через eax 1 -- знак того, что файл не является валидным
+	jmp	.L48						# | Прыгаем на метку с эпилогом
 .L49:
-	mov	eax, 0
+	mov	eax, 0						# | Возвращаем 0 через eax => файл можно читать
 .L48:
-	leave
-	ret
+	leave                           # | Эпилог
+	ret                             # \
 	.size	isFilesValid, .-isFilesValid
 	.section	.rodata
 .LC4:
@@ -538,65 +540,71 @@ isFilesValid:
 	.globl	validateInput
 	.type	validateInput, @function
 validateInput:
-	endbr64
-	push	rbp
-	mov	rbp, rsp
-	sub	rsp, 16
-	mov	DWORD PTR -4[rbp], edi
-	mov	DWORD PTR -8[rbp], esi
-	cmp	DWORD PTR -4[rbp], 1
-	jne	.L51
-	lea	rdi, .LC4[rip]
-	mov	eax, 0
-	call	printf@PLT
-	mov	eax, 1
-	jmp	.L52
+	endbr64                         # /
+	push	rbp                     # |
+	mov	rbp, rsp                    # | Пролог
+	sub	rsp, 16						# | 
+	
+	mov	DWORD PTR -4[rbp], edi		# | rbp[-4] := edi = int code1 -- первый входной параметр загружаем на стек
+	mov	DWORD PTR -8[rbp], esi		# |rbp[-4] := esi = int code2 -- второй входной параметр загружаем на стек
+	cmp	DWORD PTR -4[rbp], 1		# | Сравниваем code1 (rbp[-4]) и 1
+	jne	.L51						# | Если не равны, переходим к следующему if
+	lea	rdi, .LC4[rip]				# | Иначе загружаем в rdi адрес на начало строки для печати -- первый аргумент для вызова printf: rdi = &rip[.LC4]
+	mov	eax, 0						# | eax := 0
+	call	printf@PLT				# | Вызываем printf(rdi=&rip[.LC4])
+	mov	eax, 1						# | Возвращаем 1 через eax // return 1;
+	jmp	.L52						# | Переходим к эпилогу
 .L51:
-	cmp	DWORD PTR -8[rbp], 1
-	jne	.L53
-	lea	rdi, .LC5[rip]
-	mov	eax, 0
-	call	printf@PLT
-	mov	eax, 1
-	jmp	.L52
+	cmp	DWORD PTR -8[rbp], 1		# | Сравниваем code2 (rbp[-8]) и 1
+	jne	.L53						# | Если не равны, переходим к возврату 0 
+	lea	rdi, .LC5[rip]				# # | Иначе загружаем в rdi адрес на начало строки для печати -- первый аргумент для вызова printf: rdi = &rip[.LC5]
+	mov	eax, 0						# | eax := 0
+	call	printf@PLT				# | Вызываем printf(rdi=&rip[.LC4])
+	mov	eax, 1						# | Возвращаем 1 через eax // return 1;
+	jmp	.L52						# | Переходим к эпилогу
 .L53:
-	mov	eax, 0
+	mov	eax, 0						# | Возвращаем 0 через eax // return 0;
 .L52:
-	leave
-	ret
+	leave                           # | Эпилог
+	ret                             # \
 	.size	validateInput, .-validateInput
 	.globl	handleFileInput
 	.type	handleFileInput, @function
 handleFileInput:
-	endbr64
-	push	rbp
-	mov	rbp, rsp
-	sub	rsp, 32
-	mov	QWORD PTR -24[rbp], rdi
-	mov	QWORD PTR -32[rbp], rsi
-	mov	rdx, QWORD PTR -32[rbp]
-	mov	rax, QWORD PTR -24[rbp]
-	mov	rsi, rdx
-	mov	rdi, rax
-	call	readArraySizeFromFile
-	mov	DWORD PTR -4[rbp], eax
-	mov	rax, QWORD PTR -32[rbp]
-	mov	edx, DWORD PTR [rax]
-	mov	rax, QWORD PTR -24[rbp]
-	lea	rsi, A[rip]
-	mov	rdi, rax
-	call	readArrayFromFile
-	mov	DWORD PTR -8[rbp], eax
-	mov	rax, QWORD PTR -24[rbp]
-	mov	rdi, rax
-	call	fclose@PLT
-	mov	edx, DWORD PTR -8[rbp]
-	mov	eax, DWORD PTR -4[rbp]
-	mov	esi, edx
-	mov	edi, eax
-	call	validateInput
-	leave
-	ret
+	endbr64                         # /
+	push	rbp                     # |
+	mov	rbp, rsp                    # | Пролог
+	sub	rsp, 32						# |
+	
+	mov	QWORD PTR -24[rbp], rdi		# | rbp[-24] := rdi = FILE *input -- первый входной параметр загружаем на стек
+	mov	QWORD PTR -32[rbp], rsi		# | rbp[-32] := rsi = int *size -- второй входной параметр загружаем на стек
+	mov	rdx, QWORD PTR -32[rbp]		# | rdx := rbp[-32] = size
+	mov	rax, QWORD PTR -24[rbp]		# | rax := rbp[-24] = input
+	mov	rsi, rdx					# |	rsi := rdx = size
+	mov	rdi, rax					# |	rdi := rax = input
+	call	readArraySizeFromFile   # | Вызываем readArraySizeFromFile(rdi=input, rsi=size)
+	
+	mov	DWORD PTR -4[rbp], eax		# | rbp[-4] := eax <=> int code1 = возвращенное значение от readArraySizeFromFile
+	mov	rax, QWORD PTR -32[rbp]		# | rax := rbp[-32] = size
+	mov	edx, DWORD PTR [rax]		# | edx := [rax] = *size
+	mov	rax, QWORD PTR -24[rbp]		# |	rax := rbp[-24] = input
+	lea	rsi, A[rip]					# |	rsi := &rip[A] -- адрес на начало массива A
+	mov	rdi, rax					# | rdi := rax = input
+	call	readArrayFromFile		# | Вызываем readArrayFromFile(rdi=input, rsi=&rip[A], edx=*size)
+	
+	mov	DWORD PTR -8[rbp], eax		# | rbp[-8] := eax <=> int code1 = возвращенное значение от readArraySizeFromFile
+	mov	rax, QWORD PTR -24[rbp]		# | rax := rbp[-24] = input
+	mov	rdi, rax					# |	rdi := rax = input
+	call	fclose@PLT				# | Вызываем fclose(rdi=input)
+	
+	mov	edx, DWORD PTR -8[rbp]		# | edx := rbp[-8] = code1
+	mov	eax, DWORD PTR -4[rbp]		# | eas := rbp[-4] = code2
+	mov	esi, edx					# |	esi := edx = code2
+	mov	edi, eax					# | edi := eax = code1
+	call	validateInput			# | Вызываем validateInput(edi=code1, esi=code2)
+									# | Значение возвращаем через eax так же, как и validateInput, поэтому ничего не делаем и переходим к эпилогу 
+	leave							# | Эпилог
+	ret								# \
 	.size	handleFileInput, .-handleFileInput
 	.section	.rodata
 	.align 8
@@ -609,33 +617,39 @@ handleFileInput:
 	.globl	handleConsoleInput
 	.type	handleConsoleInput, @function
 handleConsoleInput:
-	endbr64
-	push	rbp
-	mov	rbp, rsp
-	sub	rsp, 32
-	mov	QWORD PTR -24[rbp], rdi
-	lea	rdi, .LC6[rip]
-	mov	eax, 0
-	call	printf@PLT
-	mov	rax, QWORD PTR -24[rbp]
-	mov	rdi, rax
-	call	readArraySizeFromConsole
-	mov	DWORD PTR -4[rbp], eax
-	lea	rdi, .LC7[rip]
-	call	puts@PLT
-	mov	rax, QWORD PTR -24[rbp]
-	mov	eax, DWORD PTR [rax]
-	mov	esi, eax
-	lea	rdi, A[rip]
-	call	readArrayFromConsole
-	mov	DWORD PTR -8[rbp], eax
-	mov	edx, DWORD PTR -8[rbp]
-	mov	eax, DWORD PTR -4[rbp]
-	mov	esi, edx
-	mov	edi, eax
-	call	validateInput
-	leave
-	ret
+	endbr64                         # /
+	push	rbp                     # |
+	mov	rbp, rsp                    # | Пролог
+	sub	rsp, 32						# |
+	
+	mov	QWORD PTR -24[rbp], rdi		# | rbp[-24] := rdi = int *size -- первый входной параметр загружаем на стек
+	lea	rdi, .LC6[rip]				# | rdi := &rip[.LC6] -- адрес начала строки для печати
+	mov	eax, 0						# | eax := 0
+	call	printf@PLT				# | Вызываем printf(rdi=&rip[.LC6])
+	
+	mov	rax, QWORD PTR -24[rbp]		# | rax := size
+	mov	rdi, rax					# | rdi := rax = size
+	call	readArraySizeFromConsole # \ Вызываем readArraySizeFromConsole(rdi=size)	
+	
+	mov	DWORD PTR -4[rbp], eax		#  / rbp[-4] := eax <=> int code1 = возвращенное значение от readArraySizeFromConsole(rdi=size)
+	lea	rdi, .LC7[rip]				# | rdi := &rip[.LC7] -- адрес начала строки для печати
+	call	puts@PLT				# | Вызываем puts(rdi=&rip[.LC7])
+	
+	mov	rax, QWORD PTR -24[rbp]		# | rax := rbp[-24] = size
+	mov	eax, DWORD PTR [rax]		# | eax := [rax] = *size
+	mov	esi, eax					# | esi := eax = *size
+	lea	rdi, A[rip]					# | rdi := &rip[A] -- адре на начало массива A
+	call	readArrayFromConsole	# | Вызываем readArrayFromConsole(rdi=&rip[A], esi=*size)
+	
+	mov	DWORD PTR -8[rbp], eax		# | rbp[-8] := eax <=> int code2 = возвращенное значение от readArrayFromConsole(rdi=&rip[A], esi=*size)
+	mov	edx, DWORD PTR -8[rbp]		# | edx := rbp[-8] = code2
+	mov	eax, DWORD PTR -4[rbp]		# | eax := rbp[-4] = code1
+	mov	esi, edx					# | esi := edx = code2
+	mov	edi, eax					# | edi := eax = code1
+	call	validateInput			# | Вызываем validateInput(edi=code1, esi=code2)
+									# | Значение возвращаем через eax так же, как и validateInput, поэтому ничего не делаем и переходим к эпилогу 
+	leave							# | Эпилог
+	ret								# \
 	.size	handleConsoleInput, .-handleConsoleInput
 	.section	.rodata
 .LC8:
@@ -644,133 +658,162 @@ handleConsoleInput:
 	.globl	handleRandomInput
 	.type	handleRandomInput, @function
 handleRandomInput:
-	endbr64
-	push	rbp
-	mov	rbp, rsp
-	sub	rsp, 32
-	mov	QWORD PTR -8[rbp], rdi
-	mov	QWORD PTR -16[rbp], rsi
-	mov	DWORD PTR -20[rbp], edx
-	mov	eax, 0
-	call	getRandomArraySize
-	mov	rdx, QWORD PTR -8[rbp]
-	mov	DWORD PTR [rdx], eax
-	mov	rax, QWORD PTR -8[rbp]
-	mov	eax, DWORD PTR [rax]
-	mov	esi, eax
-	lea	rdi, A[rip]
-	call	fillArrayWithRandom
-	cmp	DWORD PTR -20[rbp], 0
-	jne	.L59
-	mov	rax, QWORD PTR -8[rbp]
-	mov	eax, DWORD PTR [rax]
-	mov	esi, eax
-	lea	rdi, .LC8[rip]
-	mov	eax, 0
-	call	printf@PLT
-	mov	rax, QWORD PTR -8[rbp]
-	mov	eax, DWORD PTR [rax]
-	mov	esi, eax
-	lea	rdi, A[rip]
-	call	writeArrayToConsole
-	jmp	.L60
-.L59:
-	mov	rax, QWORD PTR -8[rbp]
-	mov	edx, DWORD PTR [rax]
-	mov	rax, QWORD PTR -16[rbp]
-	lea	rsi, B[rip]
-	mov	rdi, rax
-	call	writeArrayToFile
+	endbr64                         # /
+	push	rbp                     # |
+	mov	rbp, rsp                    # | Пролог
+	sub	rsp, 32						# |
+	
+	mov	QWORD PTR -8[rbp], rdi		# | rbp[-8] := rdi = int *size -- первый входной параметр загружаем на стек
+	mov	QWORD PTR -16[rbp], rsi		# | rbp[-16] := rsi = FILE *output -- второй входной параметр загружаем на стек
+	mov	DWORD PTR -20[rbp], edx		# |	rbp[-20] := edx = int flag_file_out -- третий входной параметр загружаем на стек
+	mov	eax, 0						# | eax := 0
+	call	getRandomArraySize		# | Вызываем getRandomArraySize()
+	
+	mov	rdx, QWORD PTR -8[rbp]		# | rdx := rbp[-8] = size
+	mov	DWORD PTR [rdx], eax		# |	[rdx] := eax <=> *size = getRandomArraySize()
+	mov	rax, QWORD PTR -8[rbp]		# | rax := rbp[-8] = size
+	mov	eax, DWORD PTR [rax]		# | eax := [rax] = *size
+	mov	esi, eax					# |	esi := eax = *size
+	lea	rdi, A[rip]					# | rdi := &rip[A] -- адрес на начало массива A
+	call	fillArrayWithRandom		# | fillArrayWithRandom(rdi=&rip[A], esi=*size)
+	
+	cmp	DWORD PTR -20[rbp], 0		# | Сравниваем flag_file_out(rbp[-20) и 0
+	jne	.L59						# |	Если не равны, переходим к else на метку .L59
+	
+	mov	rax, QWORD PTR -8[rbp]		# | rax := rbp[-8] = size
+	mov	eax, DWORD PTR [rax]		# | eax := [rax] = *size
+	mov	esi, eax					# | esi := eax
+	lea	rdi, .LC8[rip]				# | rdi := &rip[.LC8] -- адрес начала строки для печати
+	mov	eax, 0						# | eax := 0
+	call	printf@PLT				# | printf(rdi=&rip[.LC8], esi=*size)
+	
+	mov	rax, QWORD PTR -8[rbp]		# | rax := rbp[-8] = size
+	mov	eax, DWORD PTR [rax]		# | eax := [rax] = *size
+	mov	esi, eax					# | esi := eax
+	lea	rdi, A[rip]					# | rdi = &rip[A] -- адрес начала массива A
+	call	writeArrayToConsole		# | writeArrayToConsole(rdi=&rip[A], esi=*size)
+	
+	jmp	.L60						# | Переходим на метку с эпилогом
+
+.L59:								# | else				
+	mov	rax, QWORD PTR -8[rbp]		# | rax := rbp[-8] = size
+	mov	edx, DWORD PTR [rax]		# | edx := [rax] = *size
+	mov	rax, QWORD PTR -16[rbp]		# | rax := rbp[-16] = output
+	lea	rsi, A[rip]					# | rsi := &rip[A] -- адрес начала массива
+	mov	rdi, rax					# | rdi := rax
+	call	writeArrayToFile		# | writeArrayToFile(rdi=output, rsi=&rip[A], edx=*size)
 .L60:
-	mov	eax, 0
-	leave
-	ret
+	mov	eax, 0						# | Возвращаем 0 // return 0
+	
+	leave							# | Эпилог
+	ret								# \
 	.size	handleRandomInput, .-handleRandomInput
 	.globl	getTimeDiff
 	.type	getTimeDiff, @function
 getTimeDiff:
-	endbr64
-	push	rbp
-	mov	rbp, rsp
-	mov	rax, rsi
-	mov	r8, rdi
-	mov	rsi, r8
-	mov	rdi, r9
-	mov	rdi, rax
-	mov	QWORD PTR -32[rbp], rsi
-	mov	QWORD PTR -24[rbp], rdi
-	mov	QWORD PTR -48[rbp], rdx
-	mov	QWORD PTR -40[rbp], rcx
-	mov	rax, QWORD PTR -32[rbp]
-	imul	rsi, rax, 1000
-	mov	rcx, QWORD PTR -24[rbp]
-	movabs	rdx, 4835703278458516699
-	mov	rax, rcx
-	imul	rdx
-	sar	rdx, 18
-	mov	rax, rcx
-	sar	rax, 63
-	sub	rdx, rax
-	mov	rax, rdx
-	add	rax, rsi
-	mov	QWORD PTR -8[rbp], rax
-	mov	rax, QWORD PTR -48[rbp]
-	imul	rsi, rax, 1000
-	mov	rcx, QWORD PTR -40[rbp]
-	movabs	rdx, 4835703278458516699
-	mov	rax, rcx
-	imul	rdx
-	sar	rdx, 18
-	mov	rax, rcx
-	sar	rax, 63
-	sub	rdx, rax
-	mov	rax, rdx
-	add	rax, rsi
-	mov	QWORD PTR -16[rbp], rax
-	mov	rax, QWORD PTR -8[rbp]
-	sub	rax, QWORD PTR -16[rbp]
-	pop	rbp
-	ret
+	endbr64                         # /
+	push	rbp                     # |
+	mov	rbp, rsp                    # | Пролог
+	
+									# | Блок со странными обменами
+	mov	rax, rsi					# | rax := rsi = ts1.tv_nsec
+	mov	r8, rdi						# | r8 := rdi = ts1.tv_sec
+	mov	rsi, r8						# | rsi := r8 = ts1.tv_sec
+	mov	rdi, r9						# | rdi := r9 // ?????
+	mov	rdi, rax					# | rdi := rax = ts1.tv_nsec 
+	# Вообще странная штука, поменяли местами rdi и rsi, с лишним действием...
+	# При сокращении кода можно попробовать удалить
+	
+	mov	QWORD PTR -32[rbp], rsi		# | rbp[-32] := rsi = ts1.tv_sec
+	mov	QWORD PTR -24[rbp], rdi		# | rbp[-24] := rsi = ts1.tv_nsec
+	mov	QWORD PTR -48[rbp], rdx		# | rbp[-48] := rdx = ts2.tv_sec
+	mov	QWORD PTR -40[rbp], rcx		# | rbp[-40] := rdx = ts2.tv_nsec
+	
+	
+	mov	rax, QWORD PTR -32[rbp]		# | rax := rbp[-32] = ts1.tv_sec
+	imul	rsi, rax, 1000			# | rsi := rax * 1000 = ts1.tv_sec * 1000
+	mov	rcx, QWORD PTR -24[rbp]		# | rcx := rbp[-24] = ts1.tv_nsec
+	movabs	rdx, 4835703278458516699 # \ Второй операнд очень похож на константу 1000000.
+	mov	rax, rcx					#  / rax := rcx = ts1.tv_nsec
+	imul	rdx						# | rdx:rax := rax * rdx
+	sar	rdx, 18						# | 
+	mov	rax, rcx					# | 
+	sar	rax, 63						# | sar -- побитовый сдвиг вправо
+	sub	rdx, rax					# |	происходит какая-то арифметика... 
+	mov	rax, rdx					# |
+	add	rax, rsi					# | rax := rax + rsi
+	mov	QWORD PTR -8[rbp], rax		# | rbp[-8] := rax = ts1_ms
+	mov	rax, QWORD PTR -48[rbp]     # | rax := rbp[-48] = ts2.tv_sec
+	imul	rsi, rax, 1000			# |	rsi := rax * 1000
+	mov	rcx, QWORD PTR -40[rbp]		# \ rcx := rbp[-40] = ts2.tv_nsec
+	movabs	rdx, 4835703278458516699 # | Снова арифметика
+	mov	rax, rcx					# /	
+	imul	rdx						# |	
+	sar	rdx, 18						# |
+	mov	rax, rcx					# |
+	sar	rax, 63						# |
+	sub	rdx, rax					# |
+	mov	rax, rdx					# |
+	add	rax, rsi					# | rax := rax + rsi
+	mov	QWORD PTR -16[rbp], rax		# | rbp[-16] := rax = ts2_ms
+	mov	rax, QWORD PTR -8[rbp]		# | rax := rbp[-8] = ts1_ms
+	sub	rax, QWORD PTR -16[rbp]		# | rax := rax - rbp[-16] = ts1_ms - ts2_ms
+									# | Возвращаем результат через rax
+									
+	pop	rbp							# | Эпилог			
+	ret								# \
 	.size	getTimeDiff, .-getTimeDiff
 	.globl	measureTime
 	.type	measureTime, @function
 measureTime:
-	endbr64
-	push	rbp
-	mov	rbp, rsp
-	sub	rsp, 48
-	lea	rax, -32[rbp]
-	mov	rsi, rax
-	mov	edi, 1
-	call	clock_gettime@PLT
-	mov	DWORD PTR -4[rbp], 0
-	jmp	.L65
+	endbr64                         # /
+	push	rbp                     # |
+	mov	rbp, rsp                    # | Пролог
+	sub	rsp, 48						# |
+	
+	mov	QWORD PTR -8[rbp], 0		# | rbp[-8] := 0 = elapsed 		
+	mov	DWORD PTR -12[rbp], 0		# | rbp[-12] := 0 = i // Заводим счётчик цикла i
+	jmp	.L65						# | Переходим к метке, которая проверяет условие выхода из цикла
 .L66:
-	mov	eax, 10000000
-	mov	esi, eax
-	lea	rdi, A[rip]
-	call	fillArrayWithRandom
-	mov	eax, 10000000
-	mov	edi, eax
-	call	makeB
-	add	DWORD PTR -4[rbp], 1
+	mov	eax, 10000000				# | eax := 10000000 = MAX_N
+	mov	esi, eax					# | esi := eax = MAX_N
+	lea	rdi, A[rip]					# | rdi := &rip[A] -- адрес начала массива
+	call	fillArrayWithRandom		# | fillArrayWithRandom(rdi=&rip[A], esi=10000000)
+	
+	lea	rax, -32[rbp]				# | rax := rbp[-32] = &start
+	mov	rsi, rax					# | rsi := rax
+	mov	edi, 1						# | edi := 1 -- CLOCK_MONOTONIC
+	call	clock_gettime@PLT		# | clock_gettime(edi=1, rsi=&start)
+	
+	mov	eax, 10000000				# | eax := 10000000 = MAX_N
+	mov	edi, eax					# | edi := eax = 10000000
+	call	makeB					# | makeB(edi=10000000) <=> makeB(MAX_N)
+	
+	lea	rax, -48[rbp]				# | rax := rbp[-48] = &end
+	mov	rsi, rax					# | rsi := rax = &end
+	mov	edi, 1						# | edi := 1 -- CLOCK_MONOTONIC
+	call	clock_gettime@PLT		# | clock_gettime(edi=1, rsi=&end)
+	
+	mov	rax, QWORD PTR -32[rbp]		# | rax := rbp[-32] = start.tv_sec
+	mov	rdx, QWORD PTR -24[rbp]		# | rdx := rbp[-24] = start.tv_nsec
+	mov	rdi, QWORD PTR -48[rbp]		# | rdi := rbp[-48] = end.tv_sec
+	mov	rsi, QWORD PTR -40[rbp]		# | rsi := rbp[-40] = end.tv_nsec
+	mov	rcx, rdx					# | rcx := rdx = start.tv_nsec
+	mov	rdx, rax					# | rdx := rax = start.tv_sec
+	call	getTimeDiff				# | getTimeDiff(rdi=end.tv_sec, rsi=end.tv_nsec, rdx=start.tv_sec, rcx=start.tv_nsec)
+	
+	add	QWORD PTR -8[rbp], rax		# | rbp[-8] := rbp[-8] + rax //elapsed += getTimeDiff(end, start);
+	add	DWORD PTR -12[rbp], 1		# | ++i
 .L65:
-	mov	eax, 10
-	cmp	DWORD PTR -4[rbp], eax
-	jl	.L66
-	lea	rax, -48[rbp]
-	mov	rsi, rax
-	mov	edi, 1
-	call	clock_gettime@PLT
-	mov	rax, QWORD PTR -32[rbp]
-	mov	rdx, QWORD PTR -24[rbp]
-	mov	rdi, QWORD PTR -48[rbp]
-	mov	rsi, QWORD PTR -40[rbp]
-	mov	rcx, rdx
-	mov	rdx, rax
-	call	getTimeDiff
-	leave
-	ret
+	mov	eax, 10						# | eax := 10 = SAMPLE_SIZE
+	cmp	DWORD PTR -12[rbp], eax     # | Сравниваем i (rbp[-12]) и SAMPLE_SIZE (eax)
+	
+	jl	.L66						# | Если i < SAMPLE_SIZE, переходим к следующей итерации цикла
+	
+	mov	rax, QWORD PTR -8[rbp]		# | rax := rbp[-8] = elapsed -- возвращаемое значение
+	
+	leave							# | Эпилог
+	ret								# \
 	.size	measureTime, .-measureTime
 	.section	.rodata
 .LC9:
@@ -788,21 +831,25 @@ measureTime:
 	.globl	main
 	.type	main, @function
 main:
-	endbr64
-	push	rbp
-	mov	rbp, rsp
-	sub	rsp, 80
-	mov	DWORD PTR -68[rbp], edi
-	mov	QWORD PTR -80[rbp], rsi
-	mov	QWORD PTR -8[rbp], 0
-	mov	QWORD PTR -16[rbp], 0
-	mov	DWORD PTR -20[rbp], 0
-	mov	DWORD PTR -24[rbp], 0
-	mov	DWORD PTR -28[rbp], 0
-	mov	DWORD PTR -32[rbp], 0
-	mov	DWORD PTR -36[rbp], 42
-	jmp	.L69
-.L77:
+	endbr64                         # /
+	push	rbp                     # |
+	mov	rbp, rsp                    # | Пролог
+	sub	rsp, 80						# |
+	
+	mov	DWORD PTR -68[rbp], edi 	# | rbp[-68] := edi = argc
+	mov	QWORD PTR -80[rbp], rsi		# | rbp[-80] := rsi = argv
+	mov	QWORD PTR -8[rbp], 0		# | rbp[-8] := 0 = input <=> FILE *input = NULL
+	mov	QWORD PTR -16[rbp], 0		# | rbp[-16] := 0 = output <=> FILE *output = NULL
+	mov	DWORD PTR -20[rbp], 0		# | rbp[-20] := 0 = file_in_flag <=> int file_in_flag = 0
+	mov	DWORD PTR -24[rbp], 0		# | rbp[-24] := 0 = file_out_flag <=> int file_out_flag = 0
+	mov	DWORD PTR -28[rbp], 0		# | rbp[-28] := 0 = random_flag <=> int random_flag = 0
+	mov	DWORD PTR -32[rbp], 0		# | rbp[-32] := 0 = test_flag <=> int test_flag = 0
+	mov	DWORD PTR -36[rbp], 42		# | rbp[-36] := 42 = seed <=> int seed = 42
+	
+	jmp	.L69						# | Прыгаем на метку .L69				
+.L77:								
+	# Это switch
+	# Сравнивается opt (rbp[-48]) и коды символов-опций
 	cmp	DWORD PTR -48[rbp], 116
 	je	.L70
 	cmp	DWORD PTR -48[rbp], 116
@@ -824,140 +871,151 @@ main:
 	cmp	DWORD PTR -48[rbp], 105
 	je	.L75
 	jmp	.L69
-.L72:
-	mov	DWORD PTR -28[rbp], 1
+.L72: # case 'r'
+	mov	DWORD PTR -28[rbp], 1	 	# | random_flag = rpb[-28] := 1
 	jmp	.L69
-.L75:
-	mov	DWORD PTR -20[rbp], 1
-	mov	rax, QWORD PTR optarg[rip]
-	lea	rsi, .LC9[rip]
-	mov	rdi, rax
-	call	fopen@PLT
-	mov	QWORD PTR -8[rbp], rax
+.L75: # case 'i'
+	mov	DWORD PTR -20[rbp], 1		# | file_in_flag = rbp[-20] := 1
+	mov	rax, QWORD PTR optarg[rip]	# | rax := rip[optarg] -- аргумент опции (optarg -- адрес на начало строки с аргументом опции)
+	lea	rsi, .LC9[rip]				# | rsi := &rip[.LC9] -- адрес на строку с mode открытия файла
+	mov	rdi, rax					# | rdi := rax = rip[optarg]
+	call	fopen@PLT				# | fopen(rdi=rip[optarg], rsi=&rip[.LC9])
+	mov	QWORD PTR -8[rbp], rax		# | input = rbp[-8] := rax // через rax fopen вернула указатель на FILE 
 	jmp	.L69
-.L73:
-	mov	DWORD PTR -24[rbp], 1
-	mov	rax, QWORD PTR optarg[rip]
-	lea	rsi, .LC10[rip]
-	mov	rdi, rax
-	call	fopen@PLT
-	mov	QWORD PTR -16[rbp], rax
+.L73: # case 'o'
+	mov	DWORD PTR -24[rbp], 1		# | file_out_flag = rbp[-24] := 1
+	mov	rax, QWORD PTR optarg[rip]	# | rax := rip[optarg] -- аргумент опции (optarg -- адрес на начало строки с аргументом опции)
+	lea	rsi, .LC10[rip]				# | rsi := &rip[.LC10] -- адрес на строку с mode открытия файла				
+	mov	rdi, rax					# | rdi := rax = rip[optarg]
+	call	fopen@PLT				# | fopen(rdi=rip[optarg], rsi=&rip[.LC10])
+	mov	QWORD PTR -16[rbp], rax		# | output = rbp[-16] := rax // через rax fopen вернула указатель на FILE 
 	jmp	.L69
-.L71:
-	mov	rax, QWORD PTR optarg[rip]
-	mov	rdi, rax
-	call	atoi@PLT
-	mov	DWORD PTR -36[rbp], eax
+.L71: # case 's'
+	mov	rax, QWORD PTR optarg[rip] 	# | rax := rip[optarg] -- аргумент опции (optarg -- адрес на начало строки с аргументом опции) 
+	mov	rdi, rax					# | rdi := rax = rip[optarg]
+	call	atoi@PLT				# | atoi(rdi=rip[optarg])
+	mov	DWORD PTR -36[rbp], eax		# | seed = rbp[-36] := eax -- atoi вернула результат (int) через eax
 	jmp	.L69
-.L70:
-	mov	DWORD PTR -32[rbp], 1
-	jmp	.L69
+.L70: # case 't'
+	mov	DWORD PTR -32[rbp], 1 		# | test_flag = rbp[-32] := 1 
+	jmp	.L69	
 .L74:
-	mov	eax, 0
+	mov	eax, 0						# | Возвращаем 0 через eax
 	jmp	.L87
 .L69:
-	mov	rcx, QWORD PTR -80[rbp]
-	mov	eax, DWORD PTR -68[rbp]
-	lea	rdx, .LC11[rip]
-	mov	rsi, rcx
-	mov	edi, eax
-	call	getopt@PLT
-	mov	DWORD PTR -48[rbp], eax
-	cmp	DWORD PTR -48[rbp], -1
-	jne	.L77
-	mov	eax, DWORD PTR -36[rbp]
-	mov	edi, eax
-	call	srand@PLT
-	cmp	DWORD PTR -32[rbp], 0
-	je	.L78
-	mov	eax, 0
-	call	measureTime
-	mov	QWORD PTR -56[rbp], rax
-	mov	rax, QWORD PTR -56[rbp]
-	mov	rsi, rax
-	lea	rdi, .LC12[rip]
-	mov	eax, 0
-	call	printf@PLT
-	mov	eax, 0
-	jmp	.L87
+	mov	rcx, QWORD PTR -80[rbp]		# | rcx := rbp[-80] = argv
+	mov	eax, DWORD PTR -68[rbp]		# | eax := rbp[-68] = argc
+	lea	rdx, .LC11[rip]				# | rdx := &rip[.LC11] -- адрес начала строки с опциями
+	mov	rsi, rcx					# | rsi := rcx = argv
+	mov	edi, eax					# | edi := eax = argc
+	call	getopt@PLT				# | getopt(edi=argc, rsi=argv, rdx=&rip[.LC11])
+	
+	mov	DWORD PTR -48[rbp], eax		# | rbp[-48] := eax <=> opt = getopt(edi=argc, rsi=argv, rdx=&rip[.LC11]) -- getopt вернула значение через eax	
+	
+	cmp	DWORD PTR -48[rbp], -1		# | Если opt != -1
+	jne	.L77						# | Переходим к switch
+	mov	eax, DWORD PTR -36[rbp]		# | Иначе eax := rbp[-36] = seed
+	mov	edi, eax					# | edi := eax = seed
+	call	srand@PLT				# | srand(edi=seed)
+	
+	cmp	DWORD PTR -32[rbp], 0		# | test_flag == 0 ?
+	je	.L78						# | Переходи на метку .L78
+	mov	eax, 0						# | eax := 0, так как measureTime будет возвращать через eax значение
+	call	measureTime				# | measureTime()
+	mov	QWORD PTR -56[rbp], rax		# | rbp[-56] := rax <=> int64_t elapsed = measureTime() значение вернулось через rax
+	
+	mov	rax, QWORD PTR -56[rbp] 	# | rax := rbp[-56] = elapsed 
+	mov	rsi, rax					# |	rsi := rax = elapsed
+	lea	rdi, .LC12[rip]				# | rdi := &rip[.LC12] -- адрес на начало форматной строки
+	mov	eax, 0						# | eax := 0
+	call	printf@PLT				# | printf(rdi=&rip[.LC12], rsi=elapsed)
+	mov	eax, 0						# | Возвращаем 0 через eax // return 0;
+	jmp	.L87						# | Переходим к эпилогу
 .L78:
-	mov	rcx, QWORD PTR -16[rbp]
-	mov	rdx, QWORD PTR -8[rbp]
-	mov	esi, DWORD PTR -24[rbp]
-	mov	eax, DWORD PTR -20[rbp]
-	mov	edi, eax
-	call	isFilesValid
-	test	eax, eax
-	je	.L79
-	mov	eax, 0
-	jmp	.L87
+	mov	rcx, QWORD PTR -16[rbp]		# | rcx := rbp[-16] = output
+	mov	rdx, QWORD PTR -8[rbp]		# | rdx := rbp[-8] = input
+	mov	esi, DWORD PTR -24[rbp]		# | esi := rbp[-24] = file_out_flag
+	mov	eax, DWORD PTR -20[rbp]		# | eax := rbp[-20] = file_in_flag
+	mov	edi, eax					# | edi := eax = file_in_flag
+	call	isFilesValid			# | isFilesValid(rdi=file_in_flag, esi=file_out_flag, rdx=input, rcx=output)
+	test	eax, eax				# |	Проверяем, что код, который функция вернула
+	je	.L79						# | через eax != 0. Если равен, возвращаем через
+	mov	eax, 0						# |	eax 0 (return 0) и переходим к эпилогу .L87
+	jmp	.L87						# | Иначе прыгаем на .L79
 .L79:
-	mov	DWORD PTR -40[rbp], 0
-	cmp	DWORD PTR -20[rbp], 0
-	je	.L80
-	cmp	DWORD PTR -28[rbp], 1
-	je	.L80
-	lea	rdx, -60[rbp]
-	mov	rax, QWORD PTR -8[rbp]
-	mov	rsi, rdx
-	mov	rdi, rax
-	call	handleFileInput
-	mov	DWORD PTR -40[rbp], eax
+	mov	DWORD PTR -40[rbp], 0		# | status_code = rbp[-40] := 0
+	cmp	DWORD PTR -20[rbp], 0		# | Сравниваем file_in_flag (rbp[-20]) и 0
+	je	.L80						# | Если равны, переходим к проверке другого условия, && не является истинной
+	cmp	DWORD PTR -28[rbp], 1		# | Проверяем второе выражение random_flag (rbp[-28]) и 1
+	je	.L80						# | Если равны, переходим к проверке другого условия, && не является истинной
+	
+	lea	rdx, -60[rbp]				# | rdx := &rbp[-60] = &n -- адрес переменной n
+	mov	rax, QWORD PTR -8[rbp]		# | rax := rbp[-8] = input
+	mov	rsi, rdx					# | rsi := rdx = &n
+	mov	rdi, rax					# | rdi := rax = input
+	call	handleFileInput			# | handleFileInput(rdi=input, rsi=&n)
+	
+	mov	DWORD PTR -40[rbp], eax		# | status_code = rbp[-40] := eax -- handleFileInput вернула значение через eax
 	jmp	.L81
 .L80:
-	cmp	DWORD PTR -28[rbp], 1
-	je	.L82
-	lea	rax, -60[rbp]
-	mov	rdi, rax
-	call	handleConsoleInput
-	mov	DWORD PTR -40[rbp], eax
+	cmp	DWORD PTR -28[rbp], 1		# | Сравниваем random_flag (rbp[-28]) и 1
+	je	.L82						# | Если равны, переходим к else (.L82)
+	lea	rax, -60[rbp]				# | rax := &rbp[-60] = &n
+	mov	rdi, rax					# | rdi := rax = &n
+	call	handleConsoleInput		# | handleConsoleInput(rdi=&n)
+	
+	mov	DWORD PTR -40[rbp], eax 	# | status_code = rbp[-40] := eax -- handleFileInput вернула значение через eax    
 	jmp	.L81
-.L82:
-	mov	edx, DWORD PTR -24[rbp]
-	mov	rcx, QWORD PTR -16[rbp]
-	lea	rax, -60[rbp]
-	mov	rsi, rcx
-	mov	rdi, rax
-	call	handleRandomInput
+.L82: # else
+	mov	edx, DWORD PTR -24[rbp] 	# | edx := rbp[-24] = file_out_flag
+	mov	rcx, QWORD PTR -16[rbp]		# | rcx := rbp[-16] = output
+	lea	rax, -60[rbp]				# | rax := &rbp[-60] = &n
+	mov	rsi, rcx					# | rsi := rcx = output
+	mov	rdi, rax					# | rdi := rax = &n
+	call	handleRandomInput		# | handleRandomInput(rdi=&n, rsi=output, rdx=file_out_flag)
 .L81:
-	cmp	DWORD PTR -40[rbp], 0
-	je	.L83
-	mov	eax, 0
+	cmp	DWORD PTR -40[rbp], 0		# | Сравниваем status_code (rbp[-40]) и 0
+	je	.L83						# | Если status_code == 0, переходим на метку .L83
+	mov	eax, 0						# | Иначе возвращаем 0 через eax и переходим к эпилогу .L87
 	jmp	.L87
 .L83:
-	mov	eax, DWORD PTR -60[rbp]
-	mov	edi, eax
-	call	makeB
-	mov	DWORD PTR -44[rbp], 0
-	cmp	DWORD PTR -24[rbp], 0
-	jne	.L84
-	mov	eax, DWORD PTR -60[rbp]
-	mov	esi, eax
-	lea	rdi, B[rip]
-	call	writeArrayToConsole
-	mov	DWORD PTR -44[rbp], eax
+	mov	eax, DWORD PTR -60[rbp]		# | eax := rbp[-60] = n
+	mov	edi, eax					# | edi := eax = n
+	call	makeB					# | makeB(edi=n)
+	
+	mov	DWORD PTR -44[rbp], 0		# | out_state = rbp[-44] := 0
+	cmp	DWORD PTR -24[rbp], 0		# | Сравниваем file_out_flag (rbp[-24]) и 0
+	jne	.L84						# | Если не равны, переходим к else
+	mov	eax, DWORD PTR -60[rbp]		# | eax := rbp[-60] = n
+	mov	esi, eax					# | esi := eax = n
+	lea	rdi, B[rip]					# | rdi := &rip[B] -- адрес на начало массива B
+	call	writeArrayToConsole		# | writeArrayToConsole(rdi=&rip[B], rsi=n)
+	
+	mov	DWORD PTR -44[rbp], eax		# | out_state = rbp[-44] := eax -- функция вернула значение через eax 
 	jmp	.L85
 .L84:
-	mov	edx, DWORD PTR -60[rbp]
-	mov	rax, QWORD PTR -16[rbp]
-	lea	rsi, B[rip]
-	mov	rdi, rax
-	call	writeArrayToFile
-	mov	DWORD PTR -44[rbp], eax
-	mov	rax, QWORD PTR -16[rbp]
-	mov	rdi, rax
-	call	fclose@PLT
+	mov	edx, DWORD PTR -60[rbp] 	# | edx := rbp[-60] = n
+	mov	rax, QWORD PTR -16[rbp]		# | rax := rbp[-16] =  output
+	lea	rsi, B[rip]					# | rsi := &rip[B] -- адрес начала массива B
+	mov	rdi, rax					# | rdi := rax = output
+	call	writeArrayToFile		# | writeArrayToFile(rdi=output, rsi=&rip[B], edx=n)
+	
+	mov	DWORD PTR -44[rbp], eax 	# | out_state = rbp[-44] := eax -- функция вернула значение через eax 
+	
+	mov	rax, QWORD PTR -16[rbp]		# | rax := rbp[-16] = output
+	mov	rdi, rax					# | rdi := rax = output
+	call	fclose@PLT				# | fclose(rdi=output)
 .L85:
-	cmp	DWORD PTR -44[rbp], 0
-	je	.L86
-	lea	rdi, .LC13[rip]
-	mov	eax, 0
-	call	printf@PLT
+	cmp	DWORD PTR -44[rbp], 0		# | Сравниваем out_state (rbp[-44]) и 0
+	je	.L86						# | Если равны, значит всё прошло без ошибок, переходим на .L86
+	lea	rdi, .LC13[rip]				# | rdi := &rip[.LC13] -- адрес начала строки для печати
+	mov	eax, 0						# | eax := 0
+	call	printf@PLT				# | printf(rdi=&rip[.LC13]) // Печатаем сообщение об ошибке
 .L86:
-	mov	eax, 0
+	mov	eax, 0						# | Возвращаем 0 через eax
 .L87:
-	leave
-	ret
+	leave							# | Эпилог
+	ret								# \
 	.size	main, .-main
 	.ident	"GCC: (Ubuntu 9.4.0-1ubuntu1~20.04.1) 9.4.0"
 	.section	.note.GNU-stack,"",@progbits

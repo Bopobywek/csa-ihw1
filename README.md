@@ -131,4 +131,4 @@ grep -c ../logs/log_optimized -e "\bCorrect"
   <img src="https://github.com/Bopobywek/csa-ihw1/blob/main/screenshots/optimized_test.jpg">
 </p>
 
-Сам лог: [log_optimized](https://github.com/Bopobywek/csa-ihw1/blob/main/logs/https://github.com/Bopobywek/csa-ihw1/blob/main/logs/log_optimized)
+Сам лог: [log_optimized](https://github.com/Bopobywek/csa-ihw1/blob/main/logs/log_optimized)

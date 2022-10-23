@@ -24,7 +24,7 @@ def run_test(path_to_executable, input_data, answer, file_in=None, file_out=None
     process.stdin.write(input_data.encode())
     process.stdin.close()
     process.wait()
-    out_data = process.stdout.readlines()[0].decode("utf-8").strip()
+    out_data = process.stdout.readlines()[-1].decode("utf-8").strip()
     answer = answer.strip()
     print("Test:\n{}".format(input_data.strip()))
     print("Program output:\n{}".format(out_data))

@@ -1,81 +1,64 @@
-	.file	"make_b.c"
-	.intel_syntax noprefix
-	.text
-	.globl	makeB
+.intel_syntax noprefix
+
+.globl	makeB
 	.type	makeB, @function
 makeB:
-.LFB0:
-	.cfi_startproc
-	endbr64
-	push	rbp
-	.cfi_def_cfa_offset 16
-	.cfi_offset 6, -16
+	push	rbp                     # | Пролог функции
 	mov	rbp, rsp
-	.cfi_def_cfa_register 6
-	sub	rsp, 32
-	mov	DWORD PTR -20[rbp], edi
-	mov	eax, DWORD PTR -20[rbp]
-	mov	esi, eax
-	lea	rdi, A[rip]
-	call	getMin@PLT
-	mov	DWORD PTR -4[rbp], eax
-	mov	DWORD PTR -8[rbp], 0
-	jmp	.L2
-.L5:
-	mov	eax, DWORD PTR -8[rbp]
-	cdqe
-	lea	rdx, 0[0+rax*4]
-	lea	rax, A[rip]
-	mov	eax, DWORD PTR [rdx+rax]
-	test	eax, eax
-	jne	.L3
-	mov	eax, DWORD PTR -8[rbp]
-	cdqe
-	lea	rcx, 0[0+rax*4]
-	lea	rdx, B[rip]
-	mov	eax, DWORD PTR -4[rbp]
-	mov	DWORD PTR [rcx+rdx], eax
-	jmp	.L4
-.L3:
-	mov	eax, DWORD PTR -8[rbp]
-	cdqe
-	lea	rdx, 0[0+rax*4]
-	lea	rax, A[rip]
-	mov	eax, DWORD PTR [rdx+rax]
-	mov	edx, DWORD PTR -8[rbp]
-	movsx	rdx, edx
-	lea	rcx, 0[0+rdx*4]
-	lea	rdx, B[rip]
-	mov	DWORD PTR [rcx+rdx], eax
-.L4:
-	add	DWORD PTR -8[rbp], 1
-.L2:
-	mov	eax, DWORD PTR -8[rbp]
-	cmp	eax, DWORD PTR -20[rbp]
-	jl	.L5
-	nop
-	nop
-	leave
-	.cfi_def_cfa 7, 8
-	ret
-	.cfi_endproc
-.LFE0:
-	.size	makeB, .-makeB
-	.ident	"GCC: (Ubuntu 9.4.0-1ubuntu1~20.04.1) 9.4.0"
-	.section	.note.GNU-stack,"",@progbits
-	.section	.note.gnu.property,"a"
-	.align 8
-	.long	 1f - 0f
-	.long	 4f - 1f
-	.long	 5
-0:
-	.string	 "GNU"
-1:
-	.align 8
-	.long	 0xc0000002
-	.long	 3f - 2f
-2:
-	.long	 0x3
-3:
-	.align 8
-4:
+	sub	rsp, 24                     # |
+
+	mov	r12d, edi     				# | r12d := edi -- положили в r12d первый аргумент int array_size. Провели оптимизацию
+	# mov	eax, r12d     <===== исключаем лишнее копирование
+	mov	esi, r12d                    # | esi := eax -- в esi теперь array_size
+	lea	rdi, A[rip]                 # | rdi := &rip[A] -- адрес на начало массива
+	
+    call	getMin                  # | Вызов функции getMin. Первый аргумент в rdi = &rip[A], второй в esi (rsi) = array_size
+                                    # | Результат возвращается через eax
+	
+    mov	r14d, eax      				# | r14d := eax // <=> int min = getMin(A, array_size)
+	mov	r13d, 0        				# | r13d := 0 // <=> int i = 0
+	jmp	.L8         
+.L11:                               #
+	mov	eax, r13d      				# | eax := r13d // <=> eax := i
+	cdqe                            # | rax := sign-extend of eax. Копирует знак (31 бит) в старшие 32 бита регистра rax
+	lea	rdx, 0[0+rax*4]             # | rdx := rax * 4 // Подобным трюком вычисляется адрес (rax*4)[0], который равен rax * 4
+	lea	rax, A[rip]                 # | rax := &rip[A] -- адрес начала массива
+	mov	eax, DWORD PTR [rdx+rax]    # | eax := [rdx + rax] // <=> eax := A[i]
+	test	eax, eax                #
+	jne	.L9                         #
+	mov	eax, r13d      				# | eax := r13d // <=> eax := i
+	cdqe                            # | rax := sign-extend of eax. Копирует знак (31 бит) в старшие 32 бита регистра rax
+	lea	rcx, 0[0+rax*4]             # | rcx := rax * 4 // Подобным трюком вычисляется адрес (rax*4)[0], который равен rax * 4 
+	lea	rdx, B[rip]                 # | rdx := &rip[B] -- адрес начала массива B
+	mov	eax, r14d      				# | eax := r14d // <=> eax := min
+	mov	DWORD PTR [rcx+rdx], eax    # | [rcx + rdx] := eax // <=> B[i] = min
+	jmp	.L10                        # | Переходим на метку увеличения счётчика
+
+.L9:                                # | метка .L9 -- else
+	mov	eax, r13d      				# | eax := r13d // eax := i
+	cdqe                            # | rax := sign-extend of eax. Копирует знак (31 бит) в старшие 32 бита регистра rax
+	lea	rdx, 0[0+rax*4]             # | rdx := rax * 4 // Подобным трюком вычисляется адрес (rax*4)[0], который равен rax * 4
+	lea	rax, A[rip]                 # | rax := &rip[A] -- адрес начала массива A
+	mov	eax, DWORD PTR [rdx+rax]    # | eax := [rdx + rax] <=> eax := A[i]
+	mov	edx, r13d      				# | edx := r13d <=> edx := i
+	movsx	rdx, edx                # | rdx := edx // Тот же mov, но уже со знаковым расширением (sign-extend).
+                                    # | Предположительно используется потому, что cdqe нельзя использовать из-за того, что rax занят
+	lea	rcx, 0[0+rdx*4]             # | rcx := rax * 4 // Подобным трюком вычисляется адрес (rax*4)[0], который равен rax * 4 
+	lea	rdx, B[rip]                 # | rdx := &rip[B] -- адрес на начало массива B
+	mov	DWORD PTR [rcx+rdx], eax    # | [rcx + rdx] := eax <=> B[i] := A[i]
+
+.L10:                               # | метка увеличения счётчика
+	add	r13d, 1        				# | ++r13d <=> ++i
+
+.L8:                            
+	# mov	eax, r13d      	<=== 	теперь у нас есть регистры, мы можем сразу сравнивать значения в них
+	cmp	r13d, r12d     				# | Сравниваем i (eax) и array_size (rbp[-20])
+	jl	.L11                        # | Если i < array_size, переходим к телу цикла
+	
+	leave						# | Эпилог функции
+	ret                             # \
+
+# ^
+# Заменили использование стека на использование регистров r12, r13 и r14
+#
+#
